@@ -1,5 +1,5 @@
 
-本模版属于编译型的，最大特色是变量直接是用 php 的变量，毫无学习成本；其他的速度快，效率高等等的就不吹了。
+本模板系统属于编译型的，最大特色是变量直接是用 php 的变量，毫无学习成本；其他的运行速度快，开发效率高等等的就不吹了。
 
 #返回填充数据后的纯html字符串。
 echo Zandy_Template::outString('goods.htm', $siteConf['tplDir'], $siteConf['cacheDir']);
@@ -52,14 +52,14 @@ include Zandy_Template::outCache('goods.htm', $siteConf['tplDir'], $siteConf['ca
 <!--{include xxx.php}-->
 {include yyy.php}
 
-包含模版(子模版的路径按父模版的相对路径来的)：
+包含模板(子模板的路径按父模板的相对路径来的)：
 比如如下目录结构
 common/header.htm
 common/footer.htm
 index/index.htm
 index/index.menu.htm
 css.htm
-那么在 index/index.htm 里这么包含其他模版
+那么在 index/index.htm 里这么包含其他模板
 <html><body><head>
 {template ../common/header.htm}
 {template ../css.htm}
