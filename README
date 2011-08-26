@@ -1,5 +1,5 @@
 
-本模版属于编译型的，最大特色是变量直接是用 php 的变量，毫无学习成本；其他的速度快，效率高等等的就不吹了。
+本模版属于编译型的，最大特色是变量直接是用 php 的变量，毫无学习成本；其他的运行速度快，开发效率高等等的就不吹了。
 
 #返回填充数据后的纯html字符串。
 echo Zandy_Template::outString('goods.htm', $siteConf['tplDir'], $siteConf['cacheDir']);
