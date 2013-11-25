@@ -1,6 +1,6 @@
 <?php
 /**
- * @version $Id: Template.php 25707 2011-01-15 15:00:46Z yzhang $
+ * @version $Id: Template.php 45318 2013-03-19 13:21:07Z zandy $
  *
  * ! Zandy_Template 模板系统横空出世！——这么强的东西，应该搞个发明奖什么的了，哈哈——自娱一下
  * Filename : Zandy_Template.php
@@ -83,7 +83,7 @@ class Zandy_Template
 	 * @return
 	 * @throws       none
 	 */
-	function __construct()
+	public function __construct()
 	{
 	}
 
@@ -96,19 +96,25 @@ class Zandy_Template
 	 * @return
 	 * @throws       none
 	 */
-	function Zandy_Template()
+	public function Zandy_Template()
 	{
 		//self::__construct();
 		$this->__construct();
 	}
 
-	function halt($msg)
+	public static function halt($msg, $send_email = false)
 	{
+		@header('HTTP/1.1 503 Service Temporarily Unavailable');
+		@header('Status: 503 Service Temporarily Unavailable');
+		if ($send_email)
+		{
+			self::sendAlarmEmail($msg);
+		}
 		echo $msg;
 		die();
 	}
 
-	function out($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $cacheMod = ZANDY_TEMPLATE_CACHE_MOD_PHPC)
+	public static function out($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $cacheMod = ZANDY_TEMPLATE_CACHE_MOD_PHPC)
 	{
 		$mods = ZANDY_TEMPLATE_CACHE_MOD_PHPC | ZANDY_TEMPLATE_CACHE_MOD_HTML | ZANDY_TEMPLATE_CACHE_MOD_EVAL;
 		switch ($mods & $cacheMod)
@@ -129,7 +135,7 @@ class Zandy_Template
 		}
 	}
 
-	function outString($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false)
+	public static function outString($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false)
 	{
 		$f = self::outCache($tplFileName, $tplDir, $cacheDir, $forceRefreshCache);
 		ob_start();
@@ -148,8 +154,30 @@ class Zandy_Template
 	 * @return
 	 * @throws       none
 	 */
-	function outCache($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false)
+	public static function outCache($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false)
 	{
+		// {{{ 接管 error handler
+		if (!function_exists('zte_error_handler'))
+		{
+			function zte_error_handler($errno, $errstr, $errfile, $errline, $errcontext)
+			{
+				// var_dump($errno, $errstr, $errfile, $errline, $errcontext);
+				$filename = "/tmp/zte_error_handler." . date("Ymd") . ".log";
+				$data = array(
+						'datetime: ' . date("Y-m-d H:i:s"),
+						'$errno: ' . Zandy_Template::friendlyErrorType($errno),
+						'$errstr: ' . print_r($errstr, true),
+						'$errfile: ' . print_r($errfile, true),
+						'$errline: ' . print_r($errline, true)
+				);
+				$log_error = join("\n", $data) . "\n----\n";
+				Zandy_Template::sendAlarmEmail($log_error);
+				@file_put_contents($filename, $log_error, FILE_APPEND);
+			}
+		}
+		set_error_handler("zte_error_handler", E_ALL ^ E_STRICT);
+		// }}}
+		
 		if (substr($tplFileName, -4) != '.htm' && substr($tplFileName, -5) != '.html')
 		{
 			$tplFileName .= '.htm';
@@ -166,7 +194,7 @@ class Zandy_Template
 		$tplDir2 = preg_replace("/[\\\\\\/]+/", DIRECTORY_SEPARATOR, $tplDir2);
 		if (!$tplDir2 || !$tplBaseDir || false === stripos($tplDir2, $tplBaseDir))
 		{
-			Zandy_Template::halt('"' . $tplDir . '" is not a valid tpl path');
+			self::halt('$tplDir("' . $tplDir . '") is not a valid tpl path', true);
 		}
 		$cacheDir2 = '' != $cacheDir ? $cacheDir : $siteConf['tplCacheBaseDir'];
 		$cacheDir2 = realpath($cacheDir2) ? realpath($cacheDir2) . DIRECTORY_SEPARATOR : $cacheDir2;
@@ -174,10 +202,20 @@ class Zandy_Template
 		// {{{ check
 		if (empty($tplDir2) || empty($cacheDir2))
 		{
-			Zandy_Template::halt('lost parameter "$tplDir" or "$cacheDir"');
+			self::halt('lost parameter "$tplDir" or "$cacheDir"', true);
 		}
 		// }}}
-		$host = str_replace(":", "_", $_SERVER['HTTP_HOST']);
+		
+		if (defined('PROJECT_NAME'))
+		{
+			$host = strtolower(PROJECT_NAME);
+		}
+		else
+		{
+			$host = str_replace(":", "_", $_SERVER['HTTP_HOST']);
+		}
+		$host = 'ztec/' . ($host == '' ? 'cli' : '') . $host;
+		
 		$index = substr(basename($tplFileName), 0, 1);
 		$xx = str_replace($tplBaseDir, '', $tplDir2); // 取得文件相对目录层次以创建cache目录
 		$cacheDir2 = $cacheDir2 . $host . '/' . $index . '/' . $xx;
@@ -186,7 +224,7 @@ class Zandy_Template
 		if (!$cacheDir2 || !$tplCacheBaseDir || false === stripos(realpath($cacheDir2), $tplCacheBaseDir))
 		{
 			//v($cacheDir2, realpath($cacheDir2), $tplCacheBaseDir, stripos(realpath($cacheDir2), $tplCacheBaseDir));
-			Zandy_Template::halt('"' . $cacheDir . '" is not a valid cache path');
+			self::halt('"' . $cacheDir . '" is not a valid cache path', true);
 		}
 		// {{{ 为了安全和能正确的创建目录
 		$cacheDir2 = str_replace(array(
@@ -215,28 +253,80 @@ class Zandy_Template
 			{
 				Zandy_Template::mkdir($cacheRealDir, 0777, true);
 			}
-			if (!file_exists($cacheRealFilename) || filemtime($f) > filemtime($cacheRealFilename) || $forceRefreshCache || $GLOBALS['siteConf']['forceRefreshCache'] || (defined('TPL_FORCE_CACHE') && TPL_FORCE_CACHE) || filemtime($_SERVER['SCRIPT_FILENAME']) > filemtime($cacheRealFilename))
+			// tplCacheMaxTime default is one day
+			$tplCacheMaxTime = isset($siteConf['tplCacheMaxTime']) && $siteConf['tplCacheMaxTime'] > 0 ? $siteConf['tplCacheMaxTime'] : 3 * 60 * 60;
+			if (!file_exists($cacheRealFilename) || filemtime($cacheRealFilename) + $tplCacheMaxTime < time() || filemtime($f) > filemtime($cacheRealFilename) || $forceRefreshCache || $GLOBALS['siteConf']['forceRefreshCache'] || (defined('TPL_FORCE_CACHE') && TPL_FORCE_CACHE) || (isset($_SERVER['SCRIPT_FILENAME']) && filemtime($_SERVER['SCRIPT_FILENAME']) > filemtime($cacheRealFilename)))
 			{
 				$s = file_get_contents($f);
+				if (function_exists('html_compress'))
+				{
+				    $s = html_compress($s);
+				}
 				//$r = Zandy_Template::parse($s, $tplDir, $cacheDir);
 				$r = Zandy_Template::parse($s, dirname($f) . DIRECTORY_SEPARATOR, $cacheDir);
 				$r = '<?php defined(\'Zandy_Template\') || die(\'<h3>Access denied !</h3>\');' . $r . '?>';
-				file_put_contents($cacheRealFilename, $r);
+				/*
+				$fw = file_put_contents($cacheRealFilename, $r, LOCK_EX);
+				if (false === $fw)
+				{
+					self::halt("save compiled file failed: $cacheRealFilename", true);
+				}
 				@chmod($cacheRealFilename, 0777);
+				*/
+
+
+				// write to tmp file, then move to overt file lock race condition
+				$_tmp_file = $cacheRealFilename . uniqid('wrt', true);
+				if (!file_put_contents($_tmp_file, $r, LOCK_EX)) {
+					self::halt("unable to write tmp file {$_tmp_file}", true);
+					return false;
+				}
+				
+				/**
+				 * Windows' rename() fails if the destination exists,
+				 * Linux' rename() properly handles the overwrite.
+				 * Simply unlink()ing a file might cause other processes
+				 * currently reading that file to fail, but linux' rename()
+				 * seems to be smart enough to handle that for us.
+				 */
+				if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+					// remove original file
+					unlink($cacheRealFilename);
+					// rename tmp file
+					$success = rename($_tmp_file, $cacheRealFilename);
+				} else {
+					// rename tmp file
+					$success = rename($_tmp_file, $cacheRealFilename);
+					if (!$success) {
+						// remove original file
+						unlink($cacheRealFilename);
+						// rename tmp file
+						$success = rename($_tmp_file, $cacheRealFilename);
+					}
+				}
+				
+				
 			}
 			
-			self::check_syntax($cacheRealFilename, $f, true);
+			#if (!(isset($GLOBALS['ON_PRODUCT']) && $GLOBALS['ON_PRODUCT']))
+			#{
+				// do not check syntax on product environment
+				self::check_syntax($cacheRealFilename, $f);
+			#}
 			
+			restore_error_handler();
 			return $cacheRealFilename;
 		}
 		else
 		{
-			die('<p>The template file <b>' . $f . '</b> does not exists!</p>');
+			$msg = '<p>The template file <b>' . $f . '</b> does not exists!</p>';
+			self::halt($msg, true);
+			die();
 			//return false;
 		}
 	}
 
-	function check_syntax($filename, $tplName = '', $die = false)
+	public static function check_syntax($filename, $tplName = '')
 	{
 		// {{{ define function: php_check_syntax
 		if (!function_exists('php_check_syntax'))
@@ -290,21 +380,17 @@ class Zandy_Template
 				$msg .= "<strong>next line:</strong>" . str_replace(" ", "&nbsp;", htmlspecialchars($explode[$line]));
 				/*$msg .= highlight_string($explode[$line - 1], true);*/
 				$msg .= "</div></div>";
-				echo $msg;
+
+				self::halt($msg, true);
 			}
 			else
 			{
-				echo $error_message;
-			}
-			
-			if ($die)
-			{
-				die();
+				self::halt($error_message, true);
 			}
 		}
 	}
 
-	function outHTML($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $outMod = ZANDY_TEMPLATE_CACHE_MOD_HTML)
+	public static function outHTML($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $outMod = ZANDY_TEMPLATE_CACHE_MOD_HTML)
 	{
 		//global $siteConf;
 		$siteConf = isset($GLOBALS['siteConf']) ? $GLOBALS['siteConf'] : array();
@@ -336,7 +422,40 @@ class Zandy_Template
 				{
 					Zandy_Template::mkdir($cacheRealDir, 0777, true);
 				}
-				file_put_contents($cacheRealFilename, $r);
+				//file_put_contents($cacheRealFilename, $r, LOCK_EX);
+				
+
+				// write to tmp file, then move to overt file lock race condition
+				$_tmp_file = $cacheRealFilename . uniqid('wrt', true);
+				if (!file_put_contents($_tmp_file, $r, LOCK_EX)) {
+					self::halt("unable to write tmp file {$_tmp_file}", true);
+					return false;
+				}
+				
+				/**
+				 * Windows' rename() fails if the destination exists,
+				 * Linux' rename() properly handles the overwrite.
+				 * Simply unlink()ing a file might cause other processes
+				 * currently reading that file to fail, but linux' rename()
+				 * seems to be smart enough to handle that for us.
+				 */
+				if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+					// remove original file
+					unlink($cacheRealFilename);
+					// rename tmp file
+					$success = rename($_tmp_file, $cacheRealFilename);
+				} else {
+					// rename tmp file
+					$success = rename($_tmp_file, $cacheRealFilename);
+					if (!$success) {
+						// remove original file
+						unlink($cacheRealFilename);
+						// rename tmp file
+						$success = rename($_tmp_file, $cacheRealFilename);
+					}
+				}
+				
+				
 			}
 			if ($outMod & ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS)
 			{
@@ -350,7 +469,7 @@ class Zandy_Template
 		}
 	}
 
-	function outEval($tplFileName, $tplDir = '')
+	public static function outEval($tplFileName, $tplDir = '')
 	{
 		//global $siteConf;
 		$siteConf = isset($GLOBALS['siteConf']) ? $GLOBALS['siteConf'] : array();
@@ -377,9 +496,9 @@ class Zandy_Template
 	 * @return
 	 * @throws       none
 	 */
-	function parse($s, $tplDir = '', $cacheDir = '')
+	public static function parse($s, $tplDir = '', $cacheDir = '')
 	{
-		$uniqueReplaceString = md5(serialize(microtime())) . "TPL___________Zandy_20060218_Zandy__________TPL_" . time() . "" . mt_rand(0, 99999);
+		$uniqueReplaceString = md5(serialize(microtime())) . "_TPL___________Zandy_20060218_Zandy__________TPL_" . time() . mt_rand(0, 999999);
 		$EOB = "TPL___________Zandy_20060218_Zandy__________TPL_" . $uniqueReplaceString;
 		$EOB = 'Z_' . md5($EOB) . '_Y';
 		// 终（总？）有一天，你会明白我这里为什么不用 EOF
@@ -388,7 +507,7 @@ class Zandy_Template
 		$cacheDir = str_replace("\\", "/", $cacheDir);
 		$cacheDir = preg_replace("/[\\/]+/", "/", $cacheDir);
 		// 去掉注释（模板语法的注释），具体语法为 <!--{*这是注释内容*}-->
-		$s = preg_replace("/\\<\\!\\-\\-\\{\\*.+\\*\\}\\-\\-\\>/isU", '', $s);
+		$s = preg_replace("/\\<\\!\\-\\-\\{\\*.*\\*\\}\\-\\-\\>/isU", '', $s);
 		$s = "echo <<<$EOB\r\n" . $s . "\r\n$EOB;\r\n";
 		// {{{ 处理这样的模板包含： <!--{template header.htm}-->    20060519 | 20061226 补充，为了向前兼容故保留
 		$m = array();
@@ -397,7 +516,9 @@ class Zandy_Template
 		{
 			foreach ($m[1] as $k => $v)
 			{
-				$s = str_replace($m[0][$k], "\r\n$EOB;\r\ninclude Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");echo <<<$EOB\r\n", $s);
+				//$s = str_replace($m[0][$k], "\r\n$EOB;\r\ninclude Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");echo <<<$EOB\r\n", $s);
+				$tmp_md5 = uniqid('zte') . mt_rand(1, 999999);
+				$s = str_replace($m[0][$k], "\r\n$EOB;\r\n\$tpl_$tmp_md5 = Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");if(empty(\$tpl_$tmp_md5)){Zandy_Template::halt('template file: ' . \$tpl_$tmp_md5 . '; gettype: ' . gettype(\$tpl_$tmp_md5) . '; params:(" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . ")');}\$$tmp_md5 = require \$tpl_$tmp_md5;if(\$$tmp_md5===false){Zandy_Template::halt('template file: \'" . $tplDir . $v . "\'<br><br>include compiled file \'' . \$tpl_$tmp_md5 . '\' failed.<br>\$_SERVER[\"SERVER_ADDR\"]: " . $_SERVER["SERVER_ADDR"] . "<br>\$server_host: " . (isset($GLOBALS['server_host']) ? $GLOBALS['server_host'] : '') . "', true);}echo <<<$EOB\r\n", $s);
 			}
 		}
 		// 处理这样的模板包含： {template header.htm}
@@ -407,7 +528,9 @@ class Zandy_Template
 		{
 			foreach ($m[1] as $k => $v)
 			{
-				$s = str_replace($m[0][$k], "\r\n$EOB;\r\ninclude Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");echo <<<$EOB\r\n", $s);
+				//$s = str_replace($m[0][$k], "\r\n$EOB;\r\ninclude Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");echo <<<$EOB\r\n", $s);
+				$tmp_md5 = uniqid('zte') . mt_rand(1, 999999);
+				$s = str_replace($m[0][$k], "\r\n$EOB;\r\n\$tpl_$tmp_md5 = Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");if(empty(\$tpl_$tmp_md5)){Zandy_Template::halt('template file: ' . \$tpl_$tmp_md5 . '; gettype: ' . gettype(\$tpl_$tmp_md5) . '; params:(" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . ")');}\$$tmp_md5 = require \$tpl_$tmp_md5;if(\$$tmp_md5===false){Zandy_Template::halt('template file: \'" . $tplDir . $v . "\'<br><br>include compiled file \'' . \$tpl_$tmp_md5 . '\' failed.<br>\$_SERVER[\"SERVER_ADDR\"]: " . $_SERVER["SERVER_ADDR"] . "<br>\$server_host: " . (isset($GLOBALS['server_host']) ? $GLOBALS['server_host'] : '') . "', true);}echo <<<$EOB\r\n", $s);
 			}
 		}
 		// }}}
@@ -436,11 +559,11 @@ class Zandy_Template
 
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "for\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nfor(\\1){echo <<<$EOB\r\n", $s);
 		
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
 		
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loopelse|elseloop|forelse|elsefor)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop|for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}else{echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
 		//$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\/(loop|for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}}echo <<<$EOB\r\n", $s);
@@ -455,6 +578,7 @@ class Zandy_Template
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "case (\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\ncase \\1:echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "break case (\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nbreak;case \\1:echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(default)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1 :echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(continue)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(break)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/switch" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
 		// }}}
@@ -495,7 +619,7 @@ class Zandy_Template
 		// }}}
 		*/
 		//$s = preg_replace('/\{LANG (.+?)\}/si', "{\$_LANG['\\1']}", $s);
-		$s = preg_replace('/\{LANG (.+?)\}/si', "\r\n$EOB;\r\nif(isset(\$_LANG['\\1'])){echo <<<$EOB\r\n{\$_LANG['\\1']}\r\n$EOB;\r\n}elseif(isset(\$GLOBALS['siteConf']['tpl_debug'])&&\$GLOBALS['siteConf']['tpl_debug']){echo <<<$EOB\r\n!\\1!\r\n$EOB;\r\n}else{echo <<<$EOB\r\n\\1\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
+		$s = preg_replace('/\{LANG (.+?)\}/si', "\r\n$EOB;\r\nif(isset(\$_LANG[\"\\1\"])){echo <<<$EOB\r\n{\$_LANG[\"\\1\"]}\r\n$EOB;\r\n}elseif(isset(\$GLOBALS['siteConf']['tpl_debug'])&&\$GLOBALS['siteConf']['tpl_debug']){echo <<<$EOB\r\n#\\1#\r\n$EOB;\r\n}else{echo <<<$EOB\r\n\\1\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
 		// 包含php文件时也会对其内容进行处理，这是不好的地方（20060301 发现未必应该有这样的担忧）
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/ies", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/ies", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
@@ -562,13 +686,13 @@ class Zandy_Template
 			$m = join("", $a);
 		}
 		//if (empty($m)) {
-		//	return '!'.$var.'!';
+		//	return '#'.$var.'#';
 		//}
 		return '{$' . $b . $m . '}';
 	}
 	 */
 	
-	function adjustDir($dir)
+	public static function adjustDir($dir)
 	{
 		#$dir = preg_replace("/[\\/\\\\]+/", DIRECTORY_SEPARATOR, $dir);
 		$dir = preg_replace('/[\/\\\]+/', DIRECTORY_SEPARATOR, $dir);
@@ -584,7 +708,7 @@ class Zandy_Template
 	 * 下面是 mkdir 的 php5 的原型
 	 * mkdir ( string pathname [, int mode [, bool recursive [, resource context]]] )
 	 */
-	function mkdir($pathname, $mode = 0777, $recursive = null, $context = null)
+	public static function mkdir($pathname, $mode = 0777, $recursive = null, $context = null)
 	{
 		if (file_exists($pathname))
 		{
@@ -640,7 +764,7 @@ class Zandy_Template
 	 * @return
 	 * @throws       none
 	 */
-	function adjustPath($path)
+	public static function adjustPath($path)
 	{
 		$b = explode(DIRECTORY_SEPARATOR, Zandy_Template::adjustDir($path));
 		$c = array();
@@ -704,6 +828,74 @@ class Zandy_Template
 		}
 		$d = join(DIRECTORY_SEPARATOR, $c);
 		return $d;
+	}
+	
+	public static function sendAlarmEmail($msg)
+	{
+		if (function_exists('send_mail'))
+		{
+			$title = '<title>[Sev-2]Template Engine Error</title>';
+			$alarm_email = 'alarm2@tetx.com';
+			if (isset($GLOBALS['ON_PRODUCT']) && $GLOBALS['ON_PRODUCT'])
+			{
+				$title = '<title>[Sev-1]Template Engine Error</title>';
+				$alarm_email = 'alarm1@tetx.com';
+			}
+			$msg = $title . $msg;
+			$msg .= "<hr><p>PST: " . date("Y-m-d H:i:s") . "</p><hr>";
+			if (file_exists('/var/job/hostname.conf'))
+			{
+				$msg .= file_get_contents('/var/job/hostname.conf');
+			}
+			if (isset($GLOBALS['server_host']))
+			{
+				$msg .= "<br>" . $GLOBALS['server_host'];
+			}
+			
+			$msg .= "<br>" . print_r(debug_backtrace(), true);
+			
+			@send_mail($alarm_email, $msg, '', NOTICE_EMAIL, 'SYSTEM', '');
+		}
+	}
+
+	public static function friendlyErrorType($type)
+	{
+		switch ($type)
+		{
+			case E_ERROR: // 1 //
+				return 'E_ERROR';
+			case E_WARNING: // 2 //
+				return 'E_WARNING';
+			case E_PARSE: // 4 //
+				return 'E_PARSE';
+			case E_NOTICE: // 8 //
+				return 'E_NOTICE';
+			case E_CORE_ERROR: // 16 //
+				return 'E_CORE_ERROR';
+			case E_CORE_WARNING: // 32 //
+				return 'E_CORE_WARNING';
+			case E_COMPILE_ERROR: // 64 //
+				return 'E_COMPILE_ERROR';
+			case E_COMPILE_WARNING: // 128 //
+				return 'E_COMPILE_WARNING';
+			case E_USER_ERROR: // 256 //
+				return 'E_USER_ERROR';
+			case E_USER_WARNING: // 512 //
+				return 'E_USER_WARNING';
+			case E_USER_NOTICE: // 1024 //
+				return 'E_USER_NOTICE';
+			case E_STRICT: // 2048 //
+				return 'E_STRICT';
+			case E_RECOVERABLE_ERROR: // 4096 //
+				return 'E_RECOVERABLE_ERROR';
+			case E_DEPRECATED: // 8192 //
+				return 'E_DEPRECATED';
+			case E_USER_DEPRECATED: // 16384 //
+				return 'E_USER_DEPRECATED';
+			case E_ALL: // 32767 //
+				return 'E_ALL';
+		}
+		return "";
 	}
 
 } // End class
