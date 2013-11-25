@@ -551,12 +551,6 @@ class Zandy_Template
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "echo\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
 		// }}}
 		// {{{ logic
-		#$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "for\s+(\S+)\s+(\S+)\s+(\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\1)){for(\\2 = 0; \\2 < sizeof(\\1); \\2++){\\3 = \\1[\\2];echo <<<$EOB\r\n", $s);
-		#$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|for)\s+(\S+)\s+(\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)){foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
-		#$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|for)\s+(\S+)\s+(\S+)\s+(\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)){foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-		#$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|for)\s+(\S+)\s+(\S+)\s*\=\>\s*(\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (is_array(\\2)){foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-		
-
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "for\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nfor(\\1){echo <<<$EOB\r\n", $s);
 		
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
@@ -566,7 +560,6 @@ class Zandy_Template
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
 		
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loopelse|elseloop|forelse|elsefor)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop|for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}else{echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-		//$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\/(loop|for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}}echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
 		
