@@ -255,7 +255,7 @@ class Zandy_Template
 			}
 			// tplCacheMaxTime default is one day
 			$tplCacheMaxTime = isset($siteConf['tplCacheMaxTime']) && $siteConf['tplCacheMaxTime'] > 0 ? $siteConf['tplCacheMaxTime'] : 3 * 60 * 60;
-			if (!file_exists($cacheRealFilename) || filemtime($cacheRealFilename) + $tplCacheMaxTime < time() || filemtime($f) > filemtime($cacheRealFilename) || $forceRefreshCache || $GLOBALS['siteConf']['forceRefreshCache'] || (defined('TPL_FORCE_CACHE') && TPL_FORCE_CACHE) || (isset($_SERVER['SCRIPT_FILENAME']) && filemtime($_SERVER['SCRIPT_FILENAME']) > filemtime($cacheRealFilename)))
+			if (!file_exists($cacheRealFilename) || filemtime($cacheRealFilename) + $tplCacheMaxTime < time() || filemtime($f) > filemtime($cacheRealFilename) || $forceRefreshCache || (isset($GLOBALS['siteConf']['forceRefreshCache']) && $GLOBALS['siteConf']['forceRefreshCache']) || (defined('TPL_FORCE_CACHE') && TPL_FORCE_CACHE) || (isset($_SERVER['SCRIPT_FILENAME']) && filemtime($_SERVER['SCRIPT_FILENAME']) > filemtime($cacheRealFilename)))
 			{
 				$s = file_get_contents($f);
 				if (function_exists('html_compress'))
