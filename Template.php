@@ -48,6 +48,8 @@
 3, eval(Zandy_Template::out($tplName, $siteConf['tplDir'], '', false, ZANDY_TEMPLATE_CACHE_MOD_EVAL));
 // }}}
 
+此文件最后有更多使用方法例子
+
  */
 // {{{
 #!defined('TPL_BASE_DIR')    && die('please define tpl const var TPL_BASE_DIR');
@@ -177,7 +179,7 @@ class Zandy_Template
 		}
 		set_error_handler("zte_error_handler", E_ALL ^ E_STRICT);
 		// }}}
-		
+
 		if (substr($tplFileName, -4) != '.htm' && substr($tplFileName, -5) != '.html')
 		{
 			$tplFileName .= '.htm';
@@ -205,17 +207,17 @@ class Zandy_Template
 			self::halt('lost parameter "$tplDir" or "$cacheDir"', true);
 		}
 		// }}}
-		
+
 		if (defined('PROJECT_NAME'))
 		{
 			$host = strtolower(PROJECT_NAME);
 		}
 		else
 		{
-			$host = str_replace(":", "_", $_SERVER['HTTP_HOST']);
+			$host = str_replace(":", "_", isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : '');
 		}
-		$host = 'ztec/' . ($host == '' ? 'cli' : '') . $host;
-		
+		$host = 'ztec/' . ($host == '' ? 'cli' : $host);
+
 		$index = substr(basename($tplFileName), 0, 1);
 		$xx = str_replace($tplBaseDir, '', $tplDir2); // 取得文件相对目录层次以创建cache目录
 		$cacheDir2 = $cacheDir2 . $host . '/' . $index . '/' . $xx;
@@ -228,18 +230,18 @@ class Zandy_Template
 		}
 		// {{{ 为了安全和能正确的创建目录
 		$cacheDir2 = str_replace(array(
-			"*", 
-			"?", 
-			"<", 
-			">", 
-			"|", 
+			"*",
+			"?",
+			"<",
+			">",
+			"|",
 			"\""
 		), array(
-			"_", 
-			"_", 
-			"_", 
-			"_", 
-			"_", 
+			"_",
+			"_",
+			"_",
+			"_",
+			"_",
 			"_"
 		), $cacheDir2);
 		// }}}
@@ -281,7 +283,7 @@ class Zandy_Template
 					self::halt("unable to write tmp file {$_tmp_file}", true);
 					return false;
 				}
-				
+
 				/**
 				 * Windows' rename() fails if the destination exists,
 				 * Linux' rename() properly handles the overwrite.
@@ -304,16 +306,16 @@ class Zandy_Template
 						$success = rename($_tmp_file, $cacheRealFilename);
 					}
 				}
-				
-				
+
+
 			}
-			
+
 			#if (!(isset($GLOBALS['ON_PRODUCT']) && $GLOBALS['ON_PRODUCT']))
 			#{
 				// do not check syntax on product environment
 				self::check_syntax($cacheRealFilename, $f);
 			#}
-			
+
 			restore_error_handler();
 			return $cacheRealFilename;
 		}
@@ -334,9 +336,9 @@ class Zandy_Template
 			function php_check_syntax($filename, &$error_message = null)
 			{
 				$tmpcontent = file_get_contents($filename);
-				
+
 				$evalstr = "return true; ?>" . $tmpcontent . "<?php ";
-				
+
 				// {{{ 以后注意这里是否有潜在bug
 				ob_start();
 				eval($evalstr);
@@ -350,14 +352,14 @@ class Zandy_Template
 						$line = $mmm['line'];
 						$explode = explode("\n", $tmpcontent);
 						$all = sizeof($explode);
-						
+
 						$ec = explode(" in ", $obcontent);
-						
+
 						$error_message = "{$ec[0]} in $filename on line $line";
 						return false;
 					}
 				}
-				
+
 				return true;
 			}
 		}
@@ -369,7 +371,7 @@ class Zandy_Template
 			{
 				$line = $mmm['line'];
 				$explode = explode("\n", file_get_contents($filename));
-				
+
 				$tplinfo = empty($tplName) ? '' : "template file is $tplName<br />";
 				$msg = "<div style=\"border: 1px solid blue; padding: 3px; font-size: 12px;\">";
 				$msg .= $tplinfo . "<hr size=\"1\" />" . $error_message;
@@ -423,7 +425,7 @@ class Zandy_Template
 					Zandy_Template::mkdir($cacheRealDir, 0777, true);
 				}
 				//file_put_contents($cacheRealFilename, $r, LOCK_EX);
-				
+
 
 				// write to tmp file, then move to overt file lock race condition
 				$_tmp_file = $cacheRealFilename . uniqid('wrt', true);
@@ -431,7 +433,7 @@ class Zandy_Template
 					self::halt("unable to write tmp file {$_tmp_file}", true);
 					return false;
 				}
-				
+
 				/**
 				 * Windows' rename() fails if the destination exists,
 				 * Linux' rename() properly handles the overwrite.
@@ -454,8 +456,8 @@ class Zandy_Template
 						$success = rename($_tmp_file, $cacheRealFilename);
 					}
 				}
-				
-				
+
+
 			}
 			if ($outMod & ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS)
 			{
@@ -553,17 +555,19 @@ class Zandy_Template
 		// }}}
 		// {{{ logic
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "for\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nfor(\\1){echo <<<$EOB\r\n", $s);
-		
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|foreach)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|foreach)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|foreach)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|foreach)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop|foreach)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-		
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "foreach\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nforeach(\\1){echo <<<$EOB\r\n", $s);
+
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
+
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loopelse|elseloop|forelse|elsefor|foreachelse|elseforeach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop|foreach|for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}else{echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop|foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-		
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
+
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "if (.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (\\1){echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "elseif (.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}elseif (\\1){echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}\\1{echo <<<$EOB\r\n", $s);
@@ -634,10 +638,10 @@ class Zandy_Template
 				foreach ($m[1] as $k => $v)
 				{
 					$s = str_replace($m[0][$k], "echo \"" . str_replace(array(
-						"\\", 
+						"\\",
 						"\""
 					), array(
-						"\\\\", 
+						"\\\\",
 						"\\\""
 					), $v) . "\";", $s);
 				}
@@ -658,7 +662,7 @@ class Zandy_Template
 		return $r;
 	}
 	 */
-	
+
 	/**
 	 * 对多维数组的支持，也支持这样{var}的变量
 	function parseArray($var)
@@ -685,13 +689,13 @@ class Zandy_Template
 		return '{$' . $b . $m . '}';
 	}
 	 */
-	
+
 	public static function adjustDir($dir)
 	{
 		#$dir = preg_replace("/[\\/\\\\]+/", DIRECTORY_SEPARATOR, $dir);
 		$dir = preg_replace('/[\/\\\]+/', DIRECTORY_SEPARATOR, $dir);
 		$dir = str_replace(array(
-			'/./../', 
+			'/./../',
 			'/.././'
 		), '/../', $dir);
 		return $dir;
@@ -823,7 +827,7 @@ class Zandy_Template
 		$d = join(DIRECTORY_SEPARATOR, $c);
 		return $d;
 	}
-	
+
 	public static function sendAlarmEmail($msg)
 	{
 		if (function_exists('send_mail'))
@@ -845,9 +849,9 @@ class Zandy_Template
 			{
 				$msg .= "<br>" . $GLOBALS['server_host'];
 			}
-			
+
 			$msg .= "<br>" . print_r(debug_backtrace(), true);
-			
+
 			@send_mail($alarm_email, $msg, '', NOTICE_EMAIL, 'SYSTEM', '');
 		}
 	}
@@ -903,7 +907,7 @@ $a = '\/';
 var_dump($a, preg_quote($a, '/'), str_replace('\\', '\\\\', preg_quote($a, '/')));
 
 
-// usage:
+// {{{ usage:
 
 $getAll = array(
 	0 => array('id' => 1, 'name' => 'a'),
@@ -914,7 +918,7 @@ $getAll = array(
 	5 => array('id' => 6, 'name' => 'f'),
 );
 
-$filename = "tpl.php";
+$filename = "tpl.htm";
 $contents = file_get_contents($filename);
 //include Zandy_Template::outCache($contents);
 
@@ -925,7 +929,7 @@ $final_html = ob_get_clean();
 
 echo $final_html;
 
-
+// }}}
 function p($s){
 	echo '<xmp>';
 	print_r($s);
@@ -935,20 +939,20 @@ function p($s){
  */
 /**
 
-// file tpl.php
+// file tpl.htm
 
 <table align="" valign="" bgcolor="" width="100%" height="" border="1" cellspacing="0" cellpadding="3" frame="box">
 <tr bgcolor="">
 	<td nowrap>id</td>
 	<td nowrap>name</td>
 </tr>
-<!--{loop $getAll $k $v}-->
+<!--{foreach $getAll as $k => $v}-->
 <tr bgcolor="">
-	<!--{loop $v $vv}-->
-	<td nowrap><!--{if $v == 3}-->l{$vv}ll<!--{else}-->r{$vv}rr<!--{/if}--></td>
+	<!--{loop $v as $vv}-->
+	<td nowrap><!--{if $v == 3}-->l{$vv}xx<!--{else}-->r{$vv}yy<!--{/if}--></td>
 	<!--{/loop}-->
 </tr>
-<!--{/loop}-->
+<!--{/foreach}-->
 </table>
 
 // 模板里注释用法：<!--{*这是注释内容*}-->
