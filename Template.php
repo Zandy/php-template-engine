@@ -307,7 +307,6 @@ class Zandy_Template
 					}
 				}
 
-
 			}
 
 			#if (!(isset($GLOBALS['ON_PRODUCT']) && $GLOBALS['ON_PRODUCT']))
@@ -457,7 +456,6 @@ class Zandy_Template
 					}
 				}
 
-
 			}
 			if ($outMod & ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS)
 			{
@@ -550,7 +548,6 @@ class Zandy_Template
 		// }}}
 		// {{{ echo
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "echo\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "%echo\\s(.*?)%" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "echo\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
 		// }}}
 		// {{{ logic
@@ -583,9 +580,9 @@ class Zandy_Template
 		// 换行符号
 		$s = preg_replace("/\\{LF\\}/si", "\r\n", $s);
 		// {{{ 对时间简写的支持 20060704
-		$s = preg_replace("/\\{(time|now)\\}/si", "\r\n$EOB;\r\necho time();echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/\\{date ([\"|'][^\"\\}]+[\"|'])( [^\\}]*)\\}/is", "\r\n$EOB;\r\necho date(\\1, \\2);echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/\\{date ([\"|'][^\"\\}]+[\"|'])\\}/is", "\r\n$EOB;\r\necho date(\\1);echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/\\{time\\}/si", "\r\n$EOB;\r\necho time();echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/\\{now\\}/si", "\r\n$EOB;\r\necho date(\"Y-m-d H:i:s\");echo <<<$EOB\r\n", $s);
+		$s = preg_replace("/\\{date ([\"|'])([^'\"\\}]+)\\1\\}/is", "\r\n$EOB;\r\necho date(\\1\\2\\1);echo <<<$EOB\r\n", $s);
 		// }}}
 		// 输入 php 常量
 		$s = preg_replace("/\\{([A-Z_]+)\\}/s", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
@@ -619,10 +616,10 @@ class Zandy_Template
 		//$s = preg_replace('/\{LANG (.+?)\}/si', "{\$_LANG['\\1']}", $s);
 		$s = preg_replace('/\{LANG (.+?)\}/si', "\r\n$EOB;\r\nif(isset(\$_LANG[\"\\1\"])){echo <<<$EOB\r\n{\$_LANG[\"\\1\"]}\r\n$EOB;\r\n}elseif(isset(\$GLOBALS['siteConf']['tpl_debug'])&&\$GLOBALS['siteConf']['tpl_debug']){echo <<<$EOB\r\n#\\1#\r\n$EOB;\r\n}else{echo <<<$EOB\r\n\\1\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
 		// 包含php文件时也会对其内容进行处理，这是不好的地方（20060301 发现未必应该有这样的担忧）
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/ies", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/ies", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include_once\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/ies", "'\r\n$EOB;\r\ninclude_once \"\\1\";echo <<<$EOB\r\n'", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "include_once\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/ies", "'\r\n$EOB;\r\ninclude_once \"\\1\";echo <<<$EOB\r\n'", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include_once\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", "'\r\n$EOB;\r\ninclude_once \"\\1\";echo <<<$EOB\r\n'", $s);
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "include_once\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", "'\r\n$EOB;\r\ninclude_once \"\\1\";echo <<<$EOB\r\n'", $s);
 		// {{{
 		/**
 		 * 下面这样可以让编译后的代码输出语句是用双引号引起来的，
