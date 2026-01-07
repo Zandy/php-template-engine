@@ -329,66 +329,348 @@ class Zandy_Template
 
 	public static function check_syntax($filename, $tplName = '')
 	{
-		// {{{ define function: php_check_syntax
-		if (!function_exists('php_check_syntax'))
+		$error_message = null;
+		$result = false;
+		$error_line = 0;
+
+		// 优先级1: 使用 opcache_compile_file (最安全，只编译不执行)
+		// 注意：需要 OPcache 扩展已安装且已启用（在 CLI 模式下需要 opcache.enable_cli=On）
+		if (function_exists('opcache_compile_file'))
 		{
-			function php_check_syntax($filename, &$error_message = null)
+			// 检查 OPcache 是否已启用（在 CLI 模式下需要检查）
+			$opcache_enabled = true;
+			if (function_exists('opcache_get_status'))
 			{
-				$tmpcontent = file_get_contents($filename);
-
-				$evalstr = "return true; ?>" . $tmpcontent . "<?php ";
-
-				// {{{ 以后注意这里是否有潜在bug
-				ob_start();
-				eval($evalstr);
-				$obcontent = ob_get_clean();
-				// }}}
-				if ($obcontent)
+				$status = @opcache_get_status();
+				if ($status === false || (isset($status['opcache_enabled']) && !$status['opcache_enabled']))
 				{
-					preg_match('/on line (\<b\>)?(?P<line>\d+)/is', $obcontent, $mmm);
-					if (isset($mmm['line']) && $mmm['line'] >= 0)
-					{
-						$line = $mmm['line'];
-						$explode = explode("\n", $tmpcontent);
-						$all = sizeof($explode);
-
-						$ec = explode(" in ", $obcontent);
-
-						$error_message = "{$ec[0]} in $filename on line $line";
-						return false;
-					}
+					$opcache_enabled = false;
 				}
-
-				return true;
+			}
+			
+			if ($opcache_enabled)
+			{
+				$result = self::check_syntax_with_opcache($filename, $error_message, $error_line);
+			}
+			else
+			{
+				// OPcache 未启用，继续尝试下一个方法
+				$result = false;
 			}
 		}
-		// }}}
-		if (!php_check_syntax($filename, $error_message))
+		else
 		{
-			preg_match('/on line (?P<line>\d+)/is', $error_message, $mmm);
-			if (isset($mmm['line']) && $mmm['line'] >= 0)
+			$result = false;
+		}
+		
+		// 如果 opcache 检查失败（未启用或函数不存在），继续下一个优先级
+		if ($result === false && empty($error_message))
+		{
+			// 优先级2: 使用 php -l 命令 (安全，独立进程检查)
+			if (function_exists('exec') && !ini_get('safe_mode'))
 			{
-				$line = $mmm['line'];
-				$explode = explode("\n", file_get_contents($filename));
+				$result = self::check_syntax_with_php_cli($filename, $error_message, $error_line);
+			}
+			// 优先级3: 使用 eval 兜底 (不安全，但兼容性最好)
+			else
+			{
+				$result = self::check_syntax_with_eval($filename, $error_message, $error_line);
+			}
+		}
 
-				$tplinfo = empty($tplName) ? '' : "template file is $tplName<br />";
+		if (!$result && $error_message)
+		{
+			// 如果还没有提取到行号，尝试从错误信息中提取
+			if ($error_line <= 0)
+			{
+				if (preg_match('/on line (?P<line>\d+)/is', $error_message, $mmm))
+				{
+					$error_line = isset($mmm['line']) ? intval($mmm['line']) : 0;
+				}
+			}
+
+			// 构建完整的错误信息，包含编译后的文件名、原模板文件名和出错行数
+			$compiled_file = $filename; // 编译后的文件名
+			$template_file = !empty($tplName) ? $tplName : $filename; // 原模板文件名
+			
+			if ($error_line > 0)
+			{
+				$explode = explode("\n", file_get_contents($filename));
+				$line_count = count($explode);
+
+				$tplinfo = "Compiled file: <strong>" . htmlspecialchars($compiled_file) . "</strong><br />";
+				$tplinfo .= "Template file: <strong>" . htmlspecialchars($template_file) . "</strong><br />";
+				$tplinfo .= "Error on line: <strong style=\"color: red;\">{$error_line}</strong><br />";
+				
 				$msg = "<div style=\"border: 1px solid blue; padding: 3px; font-size: 12px;\">";
-				$msg .= $tplinfo . "<hr size=\"1\" />" . $error_message;
+				$msg .= $tplinfo . "<hr size=\"1\" />";
+				$msg .= "<strong>Error message:</strong> " . htmlspecialchars($error_message) . "<br />";
 				$msg .= "<div style=\"border: 1px solid red; padding: 3px;\">";
-				/*$msg .= highlight_string("<?php\r\n" . $explode[$line - 1] . "\r\n?>", true);*/
-				$msg .= "<strong>prev line:</strong>" . str_replace(" ", "&nbsp;", htmlspecialchars($explode[$line - 2])) . "<br />";
-				$msg .= "<span style=\"color: blue;\"><strong style=\"color: red;\">error line:</strong>" . str_replace(" ", "&nbsp;", htmlspecialchars($explode[$line - 1])) . "</span>" . "<br />";
-				$msg .= "<strong>next line:</strong>" . str_replace(" ", "&nbsp;", htmlspecialchars($explode[$line]));
-				/*$msg .= highlight_string($explode[$line - 1], true);*/
+				
+				// 显示错误行及上下文（确保数组索引有效）
+				if ($error_line > 1 && isset($explode[$error_line - 2]))
+				{
+					$msg .= "<strong>prev line ({$error_line} - 1):</strong>" . str_replace(" ", "&nbsp;", htmlspecialchars($explode[$error_line - 2])) . "<br />";
+				}
+				if (isset($explode[$error_line - 1]))
+				{
+					$msg .= "<span style=\"color: blue;\"><strong style=\"color: red;\">error line ({$error_line}):</strong>" . str_replace(" ", "&nbsp;", htmlspecialchars($explode[$error_line - 1])) . "</span><br />";
+				}
+				if ($error_line < $line_count && isset($explode[$error_line]))
+				{
+					$msg .= "<strong>next line ({$error_line} + 1):</strong>" . str_replace(" ", "&nbsp;", htmlspecialchars($explode[$error_line])) . "<br />";
+				}
+				
 				$msg .= "</div></div>";
 
 				self::halt($msg, true);
 			}
 			else
 			{
-				self::halt($error_message, true);
+				// 无法提取行号，但仍然显示文件名信息
+				$msg = "<div style=\"border: 1px solid blue; padding: 3px; font-size: 12px;\">";
+				$msg .= "Compiled file: <strong>" . htmlspecialchars($compiled_file) . "</strong><br />";
+				$msg .= "Template file: <strong>" . htmlspecialchars($template_file) . "</strong><br />";
+				$msg .= "<hr size=\"1\" />";
+				$msg .= "<strong>Error message:</strong> " . htmlspecialchars($error_message) . "<br />";
+				$msg .= "</div>";
+				
+				self::halt($msg, true);
 			}
 		}
+	}
+
+	/**
+	 * 使用 opcache_compile_file 检查语法 (最安全)
+	 * @param string $filename
+	 * @param string &$error_message
+	 * @param int &$error_line
+	 * @return bool
+	 */
+	private static function check_syntax_with_opcache($filename, &$error_message = null, &$error_line = 0)
+	{
+		// 清除之前的错误 (PHP 7.0+)
+		if (function_exists('error_clear_last'))
+		{
+			error_clear_last();
+		}
+
+		// 尝试编译文件（不执行）
+		$result = @opcache_compile_file($filename);
+
+		if ($result === false)
+		{
+			// 获取错误信息
+			$error = error_get_last();
+			if ($error)
+			{
+				// 尝试从错误信息中提取行号
+				if (preg_match('/on line (\<b\>)?(?P<line>\d+)/is', $error['message'], $matches))
+				{
+					$error_line = isset($matches['line']) ? intval($matches['line']) : 0;
+					$error_message = $error['message'];
+				}
+				else
+				{
+					$error_message = $error['message'];
+					$error_line = 0;
+				}
+			}
+			else
+			{
+				$error_message = "Syntax error (opcache_compile_file returned false)";
+				$error_line = 0;
+			}
+			return false;
+		}
+
+		// opcache_compile_file 在 PHP 7+ 中如果语法错误可能会抛出 ParseError
+		// 但由于使用了 @ 操作符，异常会被抑制，错误信息会通过 error_get_last() 获取
+		// 所以这里不需要额外的异常处理
+
+		return true;
+	}
+
+	/**
+	 * 使用 php -l 命令检查语法 (安全，独立进程)
+	 * @param string $filename
+	 * @param string &$error_message
+	 * @param int &$error_line
+	 * @return bool
+	 */
+	private static function check_syntax_with_php_cli($filename, &$error_message = null, &$error_line = 0)
+	{
+		// 判断操作系统
+		$is_windows = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
+
+		// 获取 PHP CLI 路径
+		$path = PHP_BINARY;
+		
+		// Windows 系统特殊处理
+		if ($is_windows)
+		{
+			// Windows 下处理 php-fpm.exe 和 php-cgi.exe
+			if (stripos($path, 'php-fpm') !== false)
+			{
+				$path = str_ireplace('php-fpm', 'php', $path);
+				// 确保保留 .exe 扩展名
+				if (substr($path, -4) !== '.exe')
+				{
+					$path_info = pathinfo($path);
+					$path = $path_info['dirname'] . DIRECTORY_SEPARATOR . $path_info['filename'] . '.exe';
+				}
+			}
+			elseif (stripos($path, 'php-cgi') !== false)
+			{
+				$path = str_ireplace('php-cgi', 'php', $path);
+				// 确保保留 .exe 扩展名
+				if (substr($path, -4) !== '.exe')
+				{
+					$path_info = pathinfo($path);
+					$path = $path_info['dirname'] . DIRECTORY_SEPARATOR . $path_info['filename'] . '.exe';
+				}
+			}
+			
+			// Windows 下确保使用 .exe 扩展名（如果路径中没有扩展名）
+			$path_info = pathinfo($path);
+			if (!isset($path_info['extension']) || empty($path_info['extension']))
+			{
+				// 检查是否存在 php.exe
+				$php_exe = $path . '.exe';
+				if (file_exists($php_exe))
+				{
+					$path = $php_exe;
+				}
+				else
+				{
+					// 如果 php.exe 不存在，尝试在相同目录下查找
+					$dir = isset($path_info['dirname']) ? $path_info['dirname'] : dirname($path);
+					$php_exe = $dir . DIRECTORY_SEPARATOR . 'php.exe';
+					if (file_exists($php_exe))
+					{
+						$path = $php_exe;
+					}
+				}
+			}
+		}
+		else
+		{
+			// Unix/Linux/macOS 系统处理
+			if (strpos($path, 'php-fpm') !== false)
+			{
+				$path = str_replace('php-fpm', 'php', $path);
+			}
+			elseif (strpos($path, 'php-cgi') !== false)
+			{
+				$path = str_replace('php-cgi', 'php', $path);
+			}
+		}
+
+		// 检测 opcache 扩展是否存在但 CLI 未启用
+		$opcache_extension_loaded = extension_loaded('Zend OPcache') || extension_loaded('opcache');
+		$opcache_cli_enabled = ini_get('opcache.enable_cli');
+		
+		// 如果 opcache 扩展存在但 CLI 未启用，使用 -d 参数在命令行中启用它
+		// 注意：ini_set() 无法设置 opcache.enable_cli（PHP_INI_SYSTEM 类型），
+		// 但可以通过命令行 -d 参数在启动时设置
+		$opcache_flag = '';
+		if ($opcache_extension_loaded && !$opcache_cli_enabled)
+		{
+			$opcache_flag = '-d opcache.enable_cli=1';
+		}
+
+		// 转义文件名，防止命令注入
+		$escaped_filename = escapeshellarg($filename);
+		$escaped_path = escapeshellarg($path);
+
+		// 构建命令（如果需要在 CLI 中启用 opcache，使用 -d 参数）
+		if (!empty($opcache_flag))
+		{
+			$command = sprintf('%s %s -l %s 2>&1', $escaped_path, $opcache_flag, $escaped_filename);
+		}
+		else
+		{
+			$command = sprintf('%s -l %s 2>&1', $escaped_path, $escaped_filename);
+		}
+
+		$output = array();
+		$return_var = 0;
+		
+		// 执行命令（Windows 和 Unix 都支持直接 exec）
+		@exec($command, $output, $return_var);
+		
+		// Windows 下如果直接 exec 失败，尝试使用 cmd /c
+		if ($is_windows && $return_var !== 0 && empty($output))
+		{
+			$cmd_command = sprintf('cmd /c %s', $command);
+			@exec($cmd_command, $output, $return_var);
+		}
+
+		// php -l 返回 0 表示语法正确，非 0 表示有错误
+		if ($return_var !== 0)
+		{
+			$error_output = implode("\n", $output);
+			
+			// 如果输出为空，可能是命令执行失败
+			if (empty($error_output))
+			{
+				$error_message = "Failed to execute PHP syntax check command. PHP binary: $path";
+				$error_line = 0;
+				return false;
+			}
+			
+			// 解析错误信息
+			if (preg_match('/on line (?P<line>\d+)/is', $error_output, $matches))
+			{
+				$error_line = isset($matches['line']) ? intval($matches['line']) : 0;
+				$error_message = trim($error_output);
+			}
+			else
+			{
+				$error_message = trim($error_output);
+				$error_line = 0;
+			}
+			return false;
+		}
+		
+		return true;
+	}
+
+	/**
+	 * 使用 eval 检查语法 (兜底方案，不安全但兼容性最好)
+	 * @param string $filename
+	 * @param string &$error_message
+	 * @param int &$error_line
+	 * @return bool
+	 */
+	private static function check_syntax_with_eval($filename, &$error_message = null, &$error_line = 0)
+	{
+		$tmpcontent = file_get_contents($filename);
+
+		$evalstr = "return true; ?>" . $tmpcontent . "<?php ";
+
+		// {{{ 以后注意这里是否有潜在bug
+		ob_start();
+		@eval($evalstr);
+		$obcontent = ob_get_clean();
+		// }}}
+		if ($obcontent)
+		{
+			preg_match('/on line (\<b\>)?(?P<line>\d+)/is', $obcontent, $mmm);
+			if (isset($mmm['line']) && $mmm['line'] >= 0)
+			{
+				$error_line = intval($mmm['line']);
+				$explode = explode("\n", $tmpcontent);
+				$all = sizeof($explode);
+
+				$ec = explode(" in ", $obcontent);
+
+				$error_message = $ec[0];
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	public static function outHTML($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $outMod = ZANDY_TEMPLATE_CACHE_MOD_HTML)

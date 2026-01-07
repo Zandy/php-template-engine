@@ -1,0 +1,23 @@
+# Docker 忽略文件
+
+# Git
+.git
+.gitignore
+
+# 测试临时文件
+test/*.log
+test/tmp/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# 文档（可选，如果需要测试时可以包含）
+# *.md
+

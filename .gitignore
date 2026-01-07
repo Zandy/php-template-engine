@@ -1,0 +1,63 @@
+# 临时文件和缓存
+*.log
+*.tmp
+*.cache
+/tmp/
+/test/tmp/
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE 和编辑器
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# 编译后的模板缓存（如果存在）
+cache/
+compiled/
+*.compiled.php
+
+# 测试生成的临时文件
+test/*.log
+test/tmp/
+test/zandy_template_test_*/
+
+# 依赖和包管理（如果有）
+vendor/
+node_modules/
+composer.lock
+
+# 环境配置（如果有敏感信息）
+.env
+.env.local
+config.local.php
+
+# 备份文件
+*.bak
+*.backup
+*~
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+$RECYCLE.BIN/
+
+# Linux
+*~
