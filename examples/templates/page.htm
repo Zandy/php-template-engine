@@ -1,0 +1,15 @@
+{template header.htm}
+
+<main>
+    <h2>主要内容</h2>
+    <p>{$content}</p>
+    
+    <h3>包含 PHP 文件示例</h3>
+    {include tools/helper.php}
+    
+    <h3>包含其他模板</h3>
+    {template sidebar.htm}
+</main>
+
+{template footer.htm}
+

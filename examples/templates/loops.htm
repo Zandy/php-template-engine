@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>循环和条件语法示例</title>
+</head>
+<body>
+    <h1>循环语法示例</h1>
+    
+    <h2>1. 基本循环（带键值）</h2>
+    <!--{loop $users $k $v}-->
+        <p>索引: {$k}, 姓名: {$v['name']}, 年龄: {$v['age']}</p>
+    <!--{/loop}-->
+    
+    <h2>2. 循环（仅值）</h2>
+    <!--{loop $users $v}-->
+        <p>姓名: {$v['name']}</p>
+    <!--{/loop}-->
+    
+    <h2>3. 循环（使用 as 关键字）</h2>
+    <!--{loop $users as $v}-->
+        <p>姓名: {$v['name']}</p>
+    <!--{/loop}-->
+    
+    <h2>4. 关联数组循环</h2>
+    <!--{loop $products $k => $v}-->
+        <p>键: {$k}, 值: {$v}</p>
+    <!--{/loop}-->
+    
+    <h2>5. 空数组处理（loopelse）</h2>
+    <!--{loop $emptyArray as $v}-->
+        <p>{$v}</p>
+    <!--{loopelse}-->
+        <p>数组为空</p>
+    <!--{/loop}-->
+    
+    <h2>6. for 循环</h2>
+    <!--{for $i = 0; $i < 5; $i++}-->
+        <span>{$i} </span>
+    <!--{/for}-->
+    
+    <h2>条件判断示例</h2>
+    
+    <h3>if/elseif/else</h3>
+    <!--{loop $users as $user}-->
+        <!--{if $user['age'] >= 30}-->
+            <p>{$user['name']}: 中年</p>
+        <!--{elseif $user['age'] >= 20}-->
+            <p>{$user['name']}: 青年</p>
+        <!--{else}-->
+            <p>{$user['name']}: 少年</p>
+        <!--{/if}-->
+    <!--{/loop}-->
+    
+    <h2>其他语法</h2>
+    
+    <h3>变量输出</h3>
+    <p>简单变量: {$users[0]['name']}</p>
+    <p>复杂变量: {$users[0]['name']} 的年龄是 {$users[0]['age']}</p>
+    
+    <h3>表达式输出</h3>
+    {echo date('Y-m-d H:i:s')}
+    
+    <h3>PHP 代码块</h3>
+    {php}
+        echo "当前时间戳: " . time();
+    {/php}
+    
+    <h3>设置变量</h3>
+    <!--{set $total = count($users)}-->
+    <p>用户总数: {$total}</p>
+</body>
+</html>
+

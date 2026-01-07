@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{$title}</title>
+</head>
+<body>
+    <h1>{$title}</h1>
+    
+    <h2>用户信息</h2>
+    <p>姓名: {$user['name']}</p>
+    <p>邮箱: {$user['email']}</p>
+    <p>年龄: {$user['age']}</p>
+    
+    <h2>商品列表</h2>
+    <ul>
+    <!--{loop $items $item}-->
+        <li>{$item}</li>
+    <!--{/loop}-->
+    </ul>
+    
+    <h2>条件判断</h2>
+    <!--{if $user['age'] >= 18}-->
+        <p>已成年</p>
+    <!--{else}-->
+        <p>未成年</p>
+    <!--{/if}-->
+</body>
+</html>
+

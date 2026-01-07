@@ -1,11 +1,25 @@
 <?php
+/**
+ * 检查模板文件中 loop 语法的工具
+ * 
+ * 用途：扫描模板目录，检查各模板文件中 loop 语法的使用情况
+ * 
+ * 使用方法：
+ *   1. 修改下面的 $tplDir 变量为你的模板目录路径
+ *   2. 运行: php examples/tools/checkzteloop.php
+ *   3. 查看输出的 HTML 表格
+ * 
+ * 或者通过命令行参数指定目录：
+ *   php examples/tools/checkzteloop.php /path/to/templates
+ */
+
 date_default_timezone_set("Asia/Shanghai");
 
 define('ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT', '<!--{');
 define('ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT', '}-->');
 
-// 配置模板文件目录
-$tplDir = '/var/www/http/tetx/tpl/';
+// 配置模板文件目录（可通过命令行参数覆盖）
+$tplDir = isset($argv[1]) ? $argv[1] : __DIR__ . '/../templates';
 
 // 配置newold正则
 $preg = array(
@@ -15,7 +29,7 @@ $preg = array(
 	),
 	array(
 		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
-		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
+		"new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
 	),
 	array(
 		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
@@ -45,8 +59,17 @@ function dirTree($dir)
 	return $r;
 }
 
+// 检查目录是否存在
+if (!is_dir($tplDir)) {
+	die("错误: 模板目录不存在: $tplDir\n使用方法: php " . basename(__FILE__) . " [模板目录路径]\n");
+}
+
 $dirTree = dirTree($tplDir);
 $sizedt = sizeof($dirTree);
+
+if ($sizedt == 0) {
+	die("错误: 模板目录为空: $tplDir\n");
+}
 
 $row1 = $row2 = '';
 foreach ($preg as $k => $v)
@@ -75,7 +98,7 @@ foreach ($dirTree as $filename)
 	foreach ($preg as $k => $v)
 	{
 		$tp1 = preg_match_all($v['old'], $s, $m);
-		$tp2 = preg_match_all($v['old'], $s, $m);
+		$tp2 = preg_match_all($v['new'], $s, $m);
 		$color = $tp1 != $tp2 ? ' style="color: red"' : '';
 		
 		$r .= "<td$color>$tp1</td><td$color>$tp2</td>";
@@ -84,7 +107,7 @@ foreach ($dirTree as $filename)
 	$r .= "</tr>";
 }
 
-$r .= "</table";
+$r .= "</table>";
 
 // output
 echo $r;

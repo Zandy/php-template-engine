@@ -161,7 +161,8 @@ class Zandy_Template
 		// {{{ 接管 error handler
 		if (!function_exists('zte_error_handler'))
 		{
-			function zte_error_handler($errno, $errstr, $errfile, $errline, $errcontext)
+			// PHP 8.0+ 移除了 $errcontext 参数，需要兼容处理
+			function zte_error_handler($errno, $errstr, $errfile, $errline, $errcontext = null)
 			{
 				// var_dump($errno, $errstr, $errfile, $errline, $errcontext);
 				$filename = "/tmp/zte_error_handler." . date("Ymd") . ".log";
@@ -177,7 +178,16 @@ class Zandy_Template
 				@file_put_contents($filename, $log_error, FILE_APPEND);
 			}
 		}
-		set_error_handler("zte_error_handler", E_ALL ^ E_STRICT);
+		// PHP 8.4+ 中 E_STRICT 已被废弃，需要兼容处理
+		// 通过文件分离避免在 PHP 8.4+ 中访问 E_STRICT 常量
+		if (PHP_VERSION_ID >= 80400) {
+			// PHP 8.4+ 直接使用 E_ALL（E_STRICT 已移除）
+			$error_level = E_ALL;
+		} else {
+			// PHP 8.4 以下版本，包含配置文件（避免在 PHP 8.4+ 中解析时访问 E_STRICT）
+			require __DIR__ . '/Template_error_level.php';
+		}
+		set_error_handler("zte_error_handler", $error_level);
 		// }}}
 
 		if (substr($tplFileName, -4) != '.htm' && substr($tplFileName, -5) != '.html')
@@ -793,7 +803,7 @@ class Zandy_Template
 		$s = "echo <<<$EOB\r\n" . $s . "\r\n$EOB;\r\n";
 		// {{{ 处理这样的模板包含： <!--{template header.htm}-->    20060519 | 20061226 补充，为了向前兼容故保留
 		$m = array();
-		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "template\\s+([^\\}^\\s]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/ies", $s, $m);
+		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "template\\s+([^\\}^\\s]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", $s, $m);
 		if (is_array($m[0]) && is_array($m[1]))
 		{
 			foreach ($m[1] as $k => $v)
@@ -805,7 +815,7 @@ class Zandy_Template
 		}
 		// 处理这样的模板包含： {template header.htm}
 		$m = array();
-		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "template\\s+([^\\}^\\s]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/ies", $s, $m);
+		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "template\\s+([^\\}^\\s]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", $s, $m);
 		if (is_array($m[0]) && is_array($m[1]))
 		{
 			foreach ($m[1] as $k => $v)
@@ -871,7 +881,7 @@ class Zandy_Template
 		/*
 		// {{{ 数组的简单访问方式支持 e.g. {arr key1 num2 key3} 解析后为 {$arr['key1'][num2]['key3']}
 		$m = array();
-		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(( [a-zA-Z0-9_\x7f-\xff]*)*)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/ies", $s, $m);
+		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(( [a-zA-Z0-9_\x7f-\xff]*)*)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", $s, $m);
 		if (is_array($m[0]) && is_array($m[1]))
 		{
 			foreach ($m[0] as $k => $v)
@@ -884,8 +894,8 @@ class Zandy_Template
 		/*
 		// {{{ 对象的简单访问方式支持 e.g. {obj.property.name} 解析后为 {$obj->property->name}
 		$m = array();
-		#preg_match_all("/".ZANDY_TEMPLATE_DELIMITER_VAR_LEFT."[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*((\.[a-zA-Z0-9_\x7f-\xff]*(\([^\)]*\))?)+)".ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT."/ies", $s, $m);
-		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(\.[a-zA-Z0-9_\x7f-\xff]*([a-zA-Z0-9_\x7f-\xff\"'\(\)\[\]\=\>\$, -]*))+" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/ies", $s, $m);
+		#preg_match_all("/".ZANDY_TEMPLATE_DELIMITER_VAR_LEFT."[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*((\.[a-zA-Z0-9_\x7f-\xff]*(\([^\)]*\))?)+)".ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT."/is", $s, $m);
+		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(\.[a-zA-Z0-9_\x7f-\xff]*([a-zA-Z0-9_\x7f-\xff\"'\(\)\[\]\=\>\$, -]*))+" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", $s, $m);
 		if (is_array($m[0]) && is_array($m[1]))
 		{
 			foreach ($m[0] as $k => $v)
@@ -1161,8 +1171,6 @@ class Zandy_Template
 				return 'E_USER_WARNING';
 			case E_USER_NOTICE: // 1024 //
 				return 'E_USER_NOTICE';
-			case E_STRICT: // 2048 //
-				return 'E_STRICT';
 			case E_RECOVERABLE_ERROR: // 4096 //
 				return 'E_RECOVERABLE_ERROR';
 			case E_DEPRECATED: // 8192 //
