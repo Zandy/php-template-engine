@@ -1,14 +1,14 @@
 <?php
 /**
  * 检查模板文件中 loop 语法的工具
- * 
+ *
  * 用途：扫描模板目录，检查各模板文件中 loop 语法的使用情况
- * 
+ *
  * 使用方法：
  *   1. 修改下面的 $tplDir 变量为你的模板目录路径
  *   2. 运行: php examples/tools/checkzteloop.php
  *   3. 查看输出的 HTML 表格
- * 
+ *
  * 或者通过命令行参数指定目录：
  *   php examples/tools/checkzteloop.php /path/to/templates
  */
@@ -23,59 +23,56 @@ $tplDir = isset($argv[1]) ? $argv[1] : __DIR__ . '/../templates';
 
 // 配置newold正则
 $preg = array(
-	array(
-		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
-		"new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
-	),
-	array(
-		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
-		"new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
-	),
-	array(
-		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
-		"new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
-	),
-	array(
-		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
-		"new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
-	),
-	array(
-		"old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
-		"new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
-	)
+    array(
+        "old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
+        "new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
+    ),
+    array(
+        "old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
+        "new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
+    ),
+    array(
+        "old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
+        "new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
+    ),
+    array(
+        "old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
+        "new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
+    ),
+    array(
+        "old" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU",
+        "new" => "/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU"
+    )
 );
 
 function dirTree($dir)
 {
-	$r = array();
-	$d = new RecursiveDirectoryIterator($dir);
-	foreach (new RecursiveIteratorIterator($d, RecursiveIteratorIterator::SELF_FIRST) as $name => $object)
-	{
-		if ($object->isFile())
-		{
-			$r[] = $name;
-		}
-	}
-	return $r;
+    $r = array();
+    $d = new RecursiveDirectoryIterator($dir);
+    foreach (new RecursiveIteratorIterator($d, RecursiveIteratorIterator::SELF_FIRST) as $name => $object) {
+        if ($object->isFile()) {
+            $r[] = $name;
+        }
+    }
+    return $r;
 }
 
 // 检查目录是否存在
 if (!is_dir($tplDir)) {
-	die("错误: 模板目录不存在: $tplDir\n使用方法: php " . basename(__FILE__) . " [模板目录路径]\n");
+    die("错误: 模板目录不存在: $tplDir\n使用方法: php " . basename(__FILE__) . " [模板目录路径]\n");
 }
 
 $dirTree = dirTree($tplDir);
 $sizedt = sizeof($dirTree);
 
 if ($sizedt == 0) {
-	die("错误: 模板目录为空: $tplDir\n");
+    die("错误: 模板目录为空: $tplDir\n");
 }
 
 $row1 = $row2 = '';
-foreach ($preg as $k => $v)
-{
-	$row1 .= "<td colspan=\"2\">regexp" . ($k + 1) . "</td>";
-	$row2 .= "<td>new</td><td>old</td>";
+foreach ($preg as $k => $v) {
+    $row1 .= "<td colspan=\"2\">regexp" . ($k + 1) . "</td>";
+    $row2 .= "<td>new</td><td>old</td>";
 }
 
 $r = <<<EOF
@@ -89,22 +86,20 @@ $r = <<<EOF
 	</tr>
 EOF;
 
-foreach ($dirTree as $filename)
-{
-	$s = file_get_contents($filename);
-	
-	$r .= "<tr><td>$filename</td>";
-	
-	foreach ($preg as $k => $v)
-	{
-		$tp1 = preg_match_all($v['old'], $s, $m);
-		$tp2 = preg_match_all($v['new'], $s, $m);
-		$color = $tp1 != $tp2 ? ' style="color: red"' : '';
-		
-		$r .= "<td$color>$tp1</td><td$color>$tp2</td>";
-	}
-	
-	$r .= "</tr>";
+foreach ($dirTree as $filename) {
+    $s = file_get_contents($filename);
+
+    $r .= "<tr><td>$filename</td>";
+
+    foreach ($preg as $k => $v) {
+        $tp1 = preg_match_all($v['old'], $s, $m);
+        $tp2 = preg_match_all($v['new'], $s, $m);
+        $color = $tp1 != $tp2 ? ' style="color: red"' : '';
+
+        $r .= "<td$color>$tp1</td><td$color>$tp2</td>";
+    }
+
+    $r .= "</tr>";
 }
 
 $r .= "</table>";
