@@ -65,7 +65,7 @@ $GLOBALS['siteConf'] = array(
 
 <!--{loop array() as $v}-->
     <li>{$v}</li>
-<!--{loopelse}-->
+<!--{loop-else}-->
     <p>没有数据</p>
 <!--{/loop}-->
 
@@ -96,12 +96,21 @@ $GLOBALS['siteConf'] = array(
 <!--{switch $value}-->
     <!--{case 1}-->
         <p>值为 1</p>
-    <!--{break case 2}-->
+    <!--{break-case 2}-->
         <p>值为 2</p>
-    <!--{default}-->
+    <!--{break-default}-->
         <p>默认值</p>
+    <!--{default}-->
+        <p>其他默认值</p>
 <!--{/switch}-->
 ```
+
+**说明**：
+- `switch` 和 `case` 支持表达式，如 `<!--{switch $x + 1}-->`、`<!--{case $y * 2}-->`
+- `break-case` 用于 fall-through：break 后继续执行下一个 case
+- `break-default` 用于 fall-through：break 后继续执行 default
+- `break` 用于跳出当前 case
+- `continue` 在 switch 中无效，仅用于循环
 
 ### 模板包含
 

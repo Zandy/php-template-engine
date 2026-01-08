@@ -172,20 +172,39 @@ $cacheFile = Zandy_Template::out('template.htm', $tplDir, $cacheDir, false, ZAND
 <!--{switch $value}-->
     <!--{case 1}-->
         <p>值为 1</p>
-    <!--{break case 2}-->
+    <!--{break-case 2}-->
         <p>值为 2</p>
-    <!--{default}-->
+    <!--{break-default}-->
         <p>默认值</p>
+    <!--{default}-->
+        <p>其他默认值</p>
 <!--{/switch}-->
 ```
+
+**说明**：
+- `switch` 和 `case` 支持表达式，如 `<!--{switch $x + 1}-->`、`<!--{case $y * 2}-->`
+- `break-case` 用于 fall-through：break 后继续执行下一个 case
+- `break-default` 用于 fall-through：break 后继续执行 default
 
 ### 循环的 else 分支
 ```html
 <!--{loop $items as $item}-->
     <li>{$item}</li>
-<!--{loopelse}-->
+<!--{loop-else}-->
     <p>没有数据</p>
 <!--{/loop}-->
+
+<!--{foreach $items as $item}-->
+    <li>{$item}</li>
+<!--{foreach-else}-->
+    <p>没有数据</p>
+<!--{/foreach}-->
+
+<!--{for $i = 0; $i < 10; $i++}-->
+    <span>{$i}</span>
+<!--{for-else}-->
+    <p>没有数据</p>
+<!--{/for}-->
 ```
 
 ## 工具脚本
