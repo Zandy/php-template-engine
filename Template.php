@@ -939,9 +939,6 @@ class Zandy_Template
         // {{{ 变量输出语法：使用 { } 分隔符
         // 注意：变量输出使用 { } 分隔符，不会破坏 HTML 结构
 
-        // 换行符号
-        $s = preg_replace("/\\{LF\\}/si", "\r\n", $s);
-
         // 对时间简写的支持 20060704
         $s = preg_replace("/\\{time\\}/si", "\r\n$EOB;\r\necho time();echo <<<$EOB\r\n", $s);
         $s = preg_replace("/\\{now\\}/si", "\r\n$EOB;\r\necho date(\"Y-m-d H:i:s\");echo <<<$EOB\r\n", $s);
