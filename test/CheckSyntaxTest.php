@@ -125,13 +125,16 @@ class CheckSyntaxTest
 			// 捕获可能的警告输出
 			ob_start();
 			$error_message = null;
-			$result = @$method->invoke(null, $file, $error_message);
+			$error_line = 0;
+			$result = @$method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			$output = ob_get_clean();
 			
 			// 如果 opcache 未启动，result 可能是 false，但这不是语法错误
 			// 我们主要验证方法能正常调用且不抛出异常
 			// 如果 opcache 未启动，我们仍然认为测试通过（因为方法能正常调用）
-			return $result !== null || !empty($output);
+			// 对于正确的语法，应该返回 true 或 false（opcache 未启动时）
+			// 但无论如何，方法应该能正常调用且不抛出异常
+			return $result !== null;
 		});
 
 		// 测试错误的语法
@@ -147,7 +150,7 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			return $result === false && !empty($error_message);
 		});
@@ -165,7 +168,7 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			return $result === false && !empty($error_message);
 		});
@@ -195,7 +198,7 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			return $result === true && $error_message === null;
 		});
@@ -213,7 +216,7 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			return $result === false && !empty($error_message);
 		});
@@ -231,7 +234,7 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			return $result === false && !empty($error_message);
 		});
@@ -255,7 +258,7 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			return $result === true && $error_message === null;
 		});
@@ -273,7 +276,7 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			return $result === false && !empty($error_message);
 		});
@@ -291,9 +294,9 @@ class CheckSyntaxTest
 			
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
-			return $result === false && preg_match('/on line \d+/i', $error_message);
+			return $result === false && !empty($error_message) && preg_match('/on line \d+/i', $error_message);
 		});
 	}
 
@@ -318,7 +321,7 @@ class CheckSyntaxTest
 			}
 				$error_message = null;
 				$error_line = 0;
-				$method->invoke(null, $file, $error_message, $error_line);
+				$method->invokeArgs(null, array($file, &$error_message, &$error_line));
 				if ($error_message)
 				{
 					$errors['opcache'] = $error_message;
@@ -337,7 +340,7 @@ class CheckSyntaxTest
 			}
 				$error_message = null;
 				$error_line = 0;
-				$method->invoke(null, $file, $error_message, $error_line);
+				$method->invokeArgs(null, array($file, &$error_message, &$error_line));
 				if ($error_message)
 				{
 					$errors['php-cli'] = $error_message;
@@ -353,13 +356,20 @@ class CheckSyntaxTest
 				$method->setAccessible(true);
 			}
 			$error_message = null;
-			$method->invokeArgs(null, array($file, &$error_message));
+			$error_line = 0;
+			$method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			if ($error_message)
 			{
 				$errors['eval'] = $error_message;
 			}
 			
 			// 所有错误信息都应该包含文件名和行号
+			// 至少应该有一个方法返回错误信息（因为测试文件有语法错误）
+			if (count($errors) === 0)
+			{
+				return false;
+			}
+			
 			$allValid = true;
 			foreach ($errors as $method => $error)
 			{
@@ -370,7 +380,7 @@ class CheckSyntaxTest
 				}
 			}
 			
-			return $allValid || count($errors) === 0;
+			return $allValid;
 		});
 	}
 
@@ -403,7 +413,7 @@ class CheckSyntaxTest
 			// 由于我们无法直接测试私有方法中的路径处理，我们通过实际执行来验证
 			$error_message = null;
 			$error_line = 0;
-			$result = $method->invoke(null, $file, $error_message, $error_line);
+			$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 			
 			// 如果能成功执行（返回 true 或 false 且有错误信息），说明路径处理正确
 			return $result !== null;
@@ -425,7 +435,8 @@ class CheckSyntaxTest
 			}
 				
 				$error_message = null;
-				$result = $method->invoke(null, $file, $error_message);
+				$error_line = 0;
+				$result = $method->invokeArgs(null, array($file, &$error_message, &$error_line));
 				
 				// 如果能执行，说明路径处理逻辑正确
 				return $result !== null;

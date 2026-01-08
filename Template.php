@@ -498,6 +498,38 @@ class Zandy_Template
 				$error_message = "Syntax error (opcache_compile_file returned false)";
 				$error_line = 0;
 			}
+			
+			// 确保错误信息包含文件名和行号
+			$basename = basename($filename);
+			if (strpos($error_message, $basename) === false)
+			{
+				if ($error_line > 0)
+				{
+					$error_message = $error_message . " in " . $basename . " on line " . $error_line;
+				}
+				else
+				{
+					$error_message = $error_message . " in " . $basename . " on line 1";
+					$error_line = 1;
+				}
+			}
+			else
+			{
+				// 如果已经包含文件名，确保行号正确
+				if (!preg_match('/on line \d+/i', $error_message))
+				{
+					if ($error_line > 0)
+					{
+						$error_message = $error_message . " on line " . $error_line;
+					}
+					else
+					{
+						$error_message = $error_message . " on line 1";
+						$error_line = 1;
+					}
+				}
+			}
+			
 			return false;
 		}
 
@@ -517,6 +549,14 @@ class Zandy_Template
 	 */
 	private static function check_syntax_with_php_cli($filename, &$error_message = null, &$error_line = 0)
 	{
+		// 检查文件是否存在
+		if (!file_exists($filename))
+		{
+			$error_message = "File not found: " . $filename;
+			$error_line = 0;
+			return false;
+		}
+		
 		// 判断操作系统
 		$is_windows = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
 
@@ -637,17 +677,33 @@ class Zandy_Template
 			}
 			
 			// 解析错误信息
-			if (preg_match('/on line (?P<line>\d+)/is', $error_output, $matches))
+			$error_output = trim($error_output);
+			if (empty($error_output))
+			{
+				$error_message = "Syntax error detected";
+				$error_line = 0;
+				return false;
+			}
+			elseif (preg_match('/on line (?P<line>\d+)/is', $error_output, $matches))
 			{
 				$error_line = isset($matches['line']) ? intval($matches['line']) : 0;
-				$error_message = trim($error_output);
+				$error_message = $error_output;
+				if (empty($error_message))
+				{
+					$error_message = "Syntax error detected";
+				}
+				return false;
 			}
 			else
 			{
-				$error_message = trim($error_output);
+				$error_message = $error_output;
+				if (empty($error_message))
+				{
+					$error_message = "Syntax error detected";
+				}
 				$error_line = 0;
+				return false;
 			}
-			return false;
 		}
 		
 		return true;
@@ -668,9 +724,132 @@ class Zandy_Template
 
 		// {{{ 以后注意这里是否有潜在bug
 		ob_start();
-		@eval($evalstr);
+		$parse_error = null;
+		
+		if (PHP_VERSION_ID >= 70000)
+		{
+			require __DIR__ . '/Template_parse_error_70.php';
+		}
+		else
+		{
+			require __DIR__ . '/Template_parse_error.php';
+		}
+		
 		$obcontent = ob_get_clean();
 		// }}}
+		
+		// PHP 5.6 中，@eval 会抑制错误输出，需要使用 error_get_last() 获取错误
+		if (PHP_VERSION_ID < 70000 && isset($GLOBALS['_zte_eval_error']))
+		{
+			$error = $GLOBALS['_zte_eval_error'];
+			unset($GLOBALS['_zte_eval_error']);
+			
+			$error_message = $error['message'];
+			$error_line = isset($error['line']) ? intval($error['line']) : 0;
+			
+			// 从错误信息中提取行号
+			if (preg_match('/on line (?P<line>\d+)/is', $error_message, $matches))
+			{
+				$extracted_line = isset($matches['line']) ? intval($matches['line']) : 0;
+				if ($extracted_line > 0)
+				{
+					/* 减去包装代码的行数（1行 return true; ?>） */
+					if ($extracted_line > 1)
+					{
+						$error_line = $extracted_line - 1;
+					}
+					else
+					{
+						$error_line = 1;
+					}
+				}
+			}
+			elseif ($error_line > 1)
+			{
+				// 减去包装代码的行数
+				$error_line = $error_line - 1;
+			}
+			
+			// 确保错误信息包含文件名和行号
+			$basename = basename($filename);
+			if (strpos($error_message, $basename) === false)
+			{
+				$error_message = $error_message . " in " . $basename . " on line " . $error_line;
+			}
+			else
+			{
+				if (!preg_match('/on line \d+/i', $error_message))
+				{
+					$error_message = $error_message . " on line " . $error_line;
+				}
+			}
+			
+			return false;
+		}
+		
+		// 如果捕获到解析错误异常，处理异常信息
+		if ($parse_error !== null)
+		{
+			$error_message = $parse_error->getMessage();
+			$exception_line = $parse_error->getLine();
+			
+			/* 异常中的行号是相对于包装代码的
+			 * 包装代码：1行 return true; ?> + 原始内容 + 1行 <?php
+			 * 所以需要从异常行号中减去 1 来得到原始文件的行号
+			 */
+			// 但如果行号是 1，说明错误在包装代码中，应该设为 1
+			if ($exception_line > 1)
+			{
+				$error_line = $exception_line - 1;
+			}
+			else
+			{
+				$error_line = 1;
+			}
+			
+			// 从异常信息中提取行号（优先使用异常信息中的行号，因为它可能更准确）
+			// 异常信息格式通常是：syntax error, unexpected '?' on line X
+			if (!empty($error_message) && preg_match('/on line (?P<line>\d+)/is', $error_message, $matches))
+			{
+				$extracted_line = isset($matches['line']) ? intval($matches['line']) : 0;
+				if ($extracted_line > 0)
+				{
+					// 如果提取的行号大于 1，也需要减去包装代码的行数
+					if ($extracted_line > 1)
+					{
+						$error_line = $extracted_line - 1;
+					}
+					else
+					{
+						$error_line = 1;
+					}
+				}
+			}
+			
+			// 构建包含文件名的错误信息
+			if (empty($error_message))
+			{
+				$error_message = "Parse error";
+			}
+			$error_message = trim($error_message);
+			// 确保错误信息包含文件名和行号
+			$basename = basename($filename);
+			if (strpos($error_message, $basename) === false)
+			{
+				$error_message = $error_message . " in " . $basename . " on line " . $error_line;
+			}
+			else
+			{
+				// 如果已经包含文件名，确保行号正确
+				if (!empty($error_message) && !preg_match('/on line \d+/i', $error_message))
+				{
+					$error_message = $error_message . " on line " . $error_line;
+				}
+			}
+			
+			return false;
+		}
+		
 		if ($obcontent)
 		{
 			preg_match('/on line (\<b\>)?(?P<line>\d+)/is', $obcontent, $mmm);
@@ -682,7 +861,50 @@ class Zandy_Template
 
 				$ec = explode(" in ", $obcontent);
 
-				$error_message = $ec[0];
+				$error_message = isset($ec[0]) && !empty($ec[0]) ? trim($ec[0]) : trim($obcontent);
+				if (empty($error_message))
+				{
+					$error_message = "Syntax error detected";
+				}
+				
+				// 确保错误信息包含文件名和行号
+				$basename = basename($filename);
+				if (strpos($error_message, $basename) === false)
+				{
+					$error_message = $error_message . " in " . $basename . " on line " . $error_line;
+				}
+				else
+				{
+					// 如果已经包含文件名，确保行号正确
+					if (!preg_match('/on line \d+/i', $error_message))
+					{
+						$error_message = $error_message . " on line " . $error_line;
+					}
+				}
+				
+				return false;
+			}
+			else
+			{
+				// 如果输出中有内容但没有匹配到行号，仍然设置错误信息
+				$error_message = trim($obcontent);
+				if (empty($error_message))
+				{
+					$error_message = "Syntax error detected";
+				}
+				$error_line = 0;
+				
+				// 确保错误信息包含文件名
+				$basename = basename($filename);
+				if (strpos($error_message, $basename) === false)
+				{
+					$error_message = $error_message . " in " . $basename;
+					if ($error_line > 0)
+					{
+						$error_message = $error_message . " on line " . $error_line;
+					}
+				}
+				
 				return false;
 			}
 		}
