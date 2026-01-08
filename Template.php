@@ -921,12 +921,12 @@ class Zandy_Template
         // loop 循环（简化语法，自动检查数组）：按从具体到抽象的顺序匹配
         // <!--{loop $arr AS $key => $value}--> (最具体：包含 AS 和 =>)
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
+        // <!--{loop $arr AS $value}-->
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
         // <!--{loop $arr $key => $value}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
         // <!--{loop $arr $key $value}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-        // <!--{loop $arr AS $value}-->
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
         // <!--{loop $arr $value}--> (最抽象：只有数组和值)
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
 
@@ -977,7 +977,9 @@ class Zandy_Template
         $s = preg_replace("/\\{([A-Z_]+)\\}/s", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
 
         // echo 表达式：{echo expression} - 直接输出表达式结果
-        $s = preg_replace("/\\{echo\\s+(.*?)\\}/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
+        // 支持 {echo "afd"} {echo $dafda} {echo $fda['fda']}，但不支持里面有换行符 \r \n
+        // 注意：只匹配空格，不匹配制表符和换行符
+        $s = preg_replace("/\\{echo +([^\r\n}]+)\\}/i", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
         // }}}
         /*
         // {{{ 数组的简单访问方式支持 e.g. {arr key1 num2 key3} 解析后为 {$arr['key1'][num2]['key3']}

@@ -38,6 +38,28 @@
         <span>{$i} </span>
     <!--{/for}-->
     
+    <h2>7. 嵌套循环</h2>
+    <!--{loop $categories as $category}-->
+        <h3>{$category['name']}</h3>
+        <ul>
+            <!--{loop $category['items'] as $item}-->
+                <li>{$item['name']} - {$item['price']}</li>
+            <!--{/loop}-->
+        </ul>
+    <!--{/loop}-->
+    
+    <h2>8. 嵌套循环（带 loop-else）</h2>
+    <!--{loop $categoriesWithEmpty as $category}-->
+        <h3>{$category['name']}</h3>
+        <ul>
+            <!--{loop $category['items'] as $item}-->
+                <li>{$item['name']} - {$item['price']}</li>
+            <!--{loop-else}-->
+                <li>该分类下暂无商品</li>
+            <!--{/loop}-->
+        </ul>
+    <!--{/loop}-->
+    
     <h2>条件判断示例</h2>
     
     <h3>if/elseif/else</h3>

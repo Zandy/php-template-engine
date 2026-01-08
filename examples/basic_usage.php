@@ -12,11 +12,6 @@ require_once __DIR__ . '/../Template.php';
 $tplDir = __DIR__ . '/templates';
 $cacheDir = __DIR__ . '/cache';
 
-// 确保缓存目录存在
-if (!is_dir($cacheDir)) {
-    mkdir($cacheDir, 0755, true);
-}
-
 // 准备数据
 $title = '欢迎使用 Zandy_Template';
 $user = array(

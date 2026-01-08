@@ -73,6 +73,15 @@ $GLOBALS['siteConf'] = array(
     <span>{$i}</span>
 <!--{/for}-->
 
+<!--{loop $categories as $category}-->
+    <h3>{$category['name']}</h3>
+    <ul>
+        <!--{loop $category['items'] as $item}-->
+            <li>{$item['name']} - {$item['price']}</li>
+        <!--{/loop}-->
+    </ul>
+<!--{/loop}-->
+
 <!--{foreach $items as $item}-->
     <li>{$item}</li>
 <!--{/foreach}-->
