@@ -32,12 +32,10 @@ include Zandy_Template::outCache('goods.htm', $siteConf['tplDir'], $siteConf['ca
 {echo xxx($aaa, $bbb);}
 {echo date("Y-m-d H:i:s", time())}
 {echo $a ? 'a' : 'b'}
-{php} if ($a) { echo 'a'; } {/php}
+<!--{php}-->
+    if ($a) { echo 'a'; }
+<!--{/php}-->
 <!--{set $a = "aaa"}-->
-{set $a = "bbb"}
-
-{eval var_dump($aaa)}
-{eval var_dump($aaa);print_r('aaa')}
 {$_LANG['title']} == {LANG title}
 
 单纯的变量、数组、对象（标准的php里双引号、heredoc里面的变量的写法）：

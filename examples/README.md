@@ -132,9 +132,9 @@ $cacheFile = Zandy_Template::out('template.htm', $tplDir, $cacheDir, false, ZAND
 ### 表达式和 PHP 代码
 ```html
 {echo date('Y-m-d H:i:s')}
-{php}
+<!--{php}-->
     // PHP 代码
-{/php}
+<!--{/php}-->
 <!--{set $var = 'value'}-->
 ```
 

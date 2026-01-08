@@ -14,42 +14,41 @@
 //ini_set('display_errors', 1);
 //error_reporting(E_ALL ^ E_NOTICE);
 /**
- * 说明：需要输出的变量请用{ }将其包含
- * 如 {$getAll[$k]['name']} 或这样 ${getAll[$k]['name']}
- * 但变量本身不可以再含 { } 了
- * 如果不是数组变量，也可以不要{ }括起来，直接 $var
- * 包含php文件时也会对其内容进行处理，这是不好的地方
-
-// {{{ 下面是模板的样本 test.htm
-
-<!--{include tpl/header.htm}-->
-
-{$helloTPL}, $helloTPL
-
-<!--{include tpl/footer.htm}-->
-
-// }}}
-
-// {{{ 输出方式可以有 3 种
-
-// 1, include Zandy_Template::outCache($tplFileName = 'test.htm', $tplDir = $siteConf['tplDir']);
-
-// 2, header("location: ".Zandy_Template::outHTML($tplFileName = 'test.htm', $tplDir = $siteConf['tplDir']));
-// or include ("location: ".Zandy_Template::outHTML($tplFileName = 'test.htm', $tplDir = $siteConf['tplDir']));
-
-// 3, eval(Zandy_Template::outEval($tplFileName = 'test.htm', $tplDir = $siteConf['tplDir']));
-
-// }}}
- * 系列函数
-
-// {{{ 当然也可以这样
-1, include_once(Zandy_Template::out($tplName, $siteConf['tplDir'], '', false, ZANDY_TEMPLATE_CACHE_MOD_PHPC));
-2, echo Zandy_Template::out($tplName, $siteConf['tplDir'], '', false, ZANDY_TEMPLATE_CACHE_MOD_HTML);
-3, eval(Zandy_Template::out($tplName, $siteConf['tplDir'], '', false, ZANDY_TEMPLATE_CACHE_MOD_EVAL));
-// }}}
-
-此文件最后有更多使用方法例子
-
+ * 模板语法说明：
+ * 
+ * 分隔符使用规范：
+ * 1. 逻辑控制语句使用 <!--{ }--> (HTML 注释包裹，浏览器预览时不破坏结构)
+ *    适用于：if, for, foreach, loop, switch, template, include, php, set 等
+ *    示例：<!--{if $condition}-->, <!--{loop $items as $item}-->, <!--{template header.htm}-->
+ *    块级语法：<!--{php}-->...<!--{/php}-->
+ * 
+ * 2. 变量输出使用 { } (简洁，不破坏结构)
+ *    适用于：{$var}, {$array['key']}, {time}, {now}, {date}, {echo}, {LANG} 等
+ *    示例：{$user['name']}, {echo date('Y-m-d')}, {time}
+ * 
+ * 模板示例：
+ * 
+ * <!--{include tpl/header.htm}-->
+ * 
+ * {$helloTPL}
+ * 
+ * <!--{if $showContent}-->
+ *     <p>内容显示</p>
+ * <!--{/if}-->
+ * 
+ * <!--{include tpl/footer.htm}-->
+ * 
+ * 输出方式：
+ * 1. include Zandy_Template::outCache($tplFileName, $tplDir);
+ * 2. echo Zandy_Template::outHTML($tplFileName, $tplDir);
+ * 3. eval(Zandy_Template::outEval($tplFileName, $tplDir));
+ * 
+ * 或者使用通用方法：
+ * include_once(Zandy_Template::out($tplName, $tplDir, '', false, ZANDY_TEMPLATE_CACHE_MOD_PHPC));
+ * echo Zandy_Template::out($tplName, $tplDir, '', false, ZANDY_TEMPLATE_CACHE_MOD_HTML);
+ * eval(Zandy_Template::out($tplName, $tplDir, '', false, ZANDY_TEMPLATE_CACHE_MOD_EVAL));
+ * 
+ * 此文件最后有更多使用方法例子
  */
 // {{{
 #!defined('TPL_BASE_DIR')    && die('please define tpl const var TPL_BASE_DIR');
@@ -62,12 +61,20 @@ defined('ZANDY_TEMPLATE_CACHE_MOD_HTML') || define('ZANDY_TEMPLATE_CACHE_MOD_HTM
 defined('ZANDY_TEMPLATE_CACHE_MOD_EVAL') || define('ZANDY_TEMPLATE_CACHE_MOD_EVAL', 4); // parsed a file and return as a string for eval
 defined('ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS') || define('ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS', 8); // cache as a html file and return the html file content
 defined('ZANDY_TEMPLATE_CACHE_SIMPLE') || define('ZANDY_TEMPLATE_CACHE_SIMPLE', 0); // 可以设为 0 或 1，与 $GLOBALS['siteConf']['EOF'] 结合使用，取 异或 的值
-define('ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT', '<!--{'); // 20060329
-define('ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT', '}-->'); // 20060329
-#define('ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT_QUOTE',  preg_quote(ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT)); // 20060329
-#define('ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT_QUOTE', preg_quote(ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT)); // 20060329
-define('ZANDY_TEMPLATE_DELIMITER_VAR_LEFT', '{'); // 20061226
-define('ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT', '}'); // 20061226
+/**
+ * 模板分隔符定义
+ * 
+ * 设计原则：
+ * - 逻辑控制语句使用 <!--{ }--> (HTML 注释包裹，浏览器预览时不破坏结构)
+ *   适用于：if, for, foreach, loop, switch, template, include, php, set 等
+ *   块级语法：<!--{php}-->...<!--{/php}-->
+ * - 变量输出使用 { } (简洁，不破坏结构)
+ *   适用于：{$var}, {$array['key']}, {time}, {now}, {date}, {LANG} 等
+ */
+define('ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT', '<!--{'); // 逻辑控制语句左分隔符
+define('ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT', '}-->'); // 逻辑控制语句右分隔符
+define('ZANDY_TEMPLATE_DELIMITER_VAR_LEFT', '{'); // 变量输出左分隔符
+define('ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT', '}'); // 变量输出右分隔符
 
 
 #define('ZANDY_TEMPLATE_DELIMITER_VAR_LEFT_QUOTE',  preg_quote(ZANDY_TEMPLATE_DELIMITER_VAR_LEFT)); // 20061226
@@ -801,46 +808,25 @@ class Zandy_Template
 		// 去掉注释（模板语法的注释），具体语法为 <!--{*这是注释内容*}-->
 		$s = preg_replace("/\\<\\!\\-\\-\\{\\*.*\\*\\}\\-\\-\\>/isU", '', $s);
 		$s = "echo <<<$EOB\r\n" . $s . "\r\n$EOB;\r\n";
-		// {{{ 处理这样的模板包含： <!--{template header.htm}-->    20060519 | 20061226 补充，为了向前兼容故保留
+		// {{{ 处理模板包含：<!--{template header.htm}-->
+		// 注意：逻辑控制语句统一使用 <!--{ }--> 分隔符，浏览器预览时不会破坏 HTML 结构
 		$m = array();
-		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "template\\s+([^\\}^\\s]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", $s, $m);
+		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "template\\s+([^\\}\\s]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", $s, $m);
 		if (is_array($m[0]) && is_array($m[1]))
 		{
 			foreach ($m[1] as $k => $v)
 			{
-				//$s = str_replace($m[0][$k], "\r\n$EOB;\r\ninclude Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");echo <<<$EOB\r\n", $s);
-				$tmp_md5 = uniqid('zte') . mt_rand(1, 999999);
-				$s = str_replace($m[0][$k], "\r\n$EOB;\r\n\$tpl_$tmp_md5 = Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");if(empty(\$tpl_$tmp_md5)){Zandy_Template::halt('template file: ' . \$tpl_$tmp_md5 . '; gettype: ' . gettype(\$tpl_$tmp_md5) . '; params:(" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . ")');}\$$tmp_md5 = require \$tpl_$tmp_md5;if(\$$tmp_md5===false){Zandy_Template::halt('template file: \'" . $tplDir . $v . "\'<br><br>include compiled file \'' . \$tpl_$tmp_md5 . '\' failed.<br>\$_SERVER[\"SERVER_ADDR\"]: " . $_SERVER["SERVER_ADDR"] . "<br>\$server_host: " . (isset($GLOBALS['server_host']) ? $GLOBALS['server_host'] : '') . "', true);}echo <<<$EOB\r\n", $s);
-			}
-		}
-		// 处理这样的模板包含： {template header.htm}
-		$m = array();
-		preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "template\\s+([^\\}^\\s]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", $s, $m);
-		if (is_array($m[0]) && is_array($m[1]))
-		{
-			foreach ($m[1] as $k => $v)
-			{
-				//$s = str_replace($m[0][$k], "\r\n$EOB;\r\ninclude Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");echo <<<$EOB\r\n", $s);
 				$tmp_md5 = uniqid('zte') . mt_rand(1, 999999);
 				$s = str_replace($m[0][$k], "\r\n$EOB;\r\n\$tpl_$tmp_md5 = Zandy_Template::outCache(\"" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . "\");if(empty(\$tpl_$tmp_md5)){Zandy_Template::halt('template file: ' . \$tpl_$tmp_md5 . '; gettype: ' . gettype(\$tpl_$tmp_md5) . '; params:(" . $v . "\", \"" . $tplDir . "\", \"" . $cacheDir . ")');}\$$tmp_md5 = require \$tpl_$tmp_md5;if(\$$tmp_md5===false){Zandy_Template::halt('template file: \'" . $tplDir . $v . "\'<br><br>include compiled file \'' . \$tpl_$tmp_md5 . '\' failed.<br>\$_SERVER[\"SERVER_ADDR\"]: " . $_SERVER["SERVER_ADDR"] . "<br>\$server_host: " . (isset($GLOBALS['server_host']) ? $GLOBALS['server_host'] : '') . "', true);}echo <<<$EOB\r\n", $s);
 			}
 		}
 		// }}}
-		// {{{ php 代码
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "php\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "php\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
+		// {{{ php 代码块：<!--{php}-->...<!--{/php}-->
+		// 支持块级 PHP 代码，浏览器预览时不会破坏 HTML 结构
+		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "php" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/php" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
 		// }}}
-		// {{{ set 变量
+		// {{{ set 变量：<!--{set $var = value}-->
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "set\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "set\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
-		// }}}
-		// {{{ eval 执行 php 代码，同上面的 php
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "eval\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "eval\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
-		// }}}
-		// {{{ echo
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "echo\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "echo\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
 		// }}}
 		// {{{ logic
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "for\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nfor(\\1){echo <<<$EOB\r\n", $s);
@@ -869,15 +855,23 @@ class Zandy_Template
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(break)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/switch" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
 		// }}}
+		// {{{ 变量输出语法：使用 { } 分隔符
+		// 注意：变量输出使用 { } 分隔符，不会破坏 HTML 结构
+		
 		// 换行符号
 		$s = preg_replace("/\\{LF\\}/si", "\r\n", $s);
-		// {{{ 对时间简写的支持 20060704
+		
+		// 对时间简写的支持 20060704
 		$s = preg_replace("/\\{time\\}/si", "\r\n$EOB;\r\necho time();echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/\\{now\\}/si", "\r\n$EOB;\r\necho date(\"Y-m-d H:i:s\");echo <<<$EOB\r\n", $s);
 		$s = preg_replace("/\\{date ([\"|'])([^'\"\\}]+)\\1\\}/is", "\r\n$EOB;\r\necho date(\\1\\2\\1);echo <<<$EOB\r\n", $s);
-		// }}}
-		// 输入 php 常量
+		
+		// 输出 PHP 常量：{CONSTANT_NAME}
 		$s = preg_replace("/\\{([A-Z_]+)\\}/s", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
+		
+		// echo 表达式：{echo expression} - 直接输出表达式结果
+		$s = preg_replace("/\\{echo\\s+(.*?)\\}/si", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
+		// }}}
 		/*
 		// {{{ 数组的简单访问方式支持 e.g. {arr key1 num2 key3} 解析后为 {$arr['key1'][num2]['key3']}
 		$m = array();
@@ -905,13 +899,13 @@ class Zandy_Template
 		}
 		// }}}
 		*/
-		//$s = preg_replace('/\{LANG (.+?)\}/si', "{\$_LANG['\\1']}", $s);
+		// 语言包：{LANG key}
 		$s = preg_replace('/\{LANG (.+?)\}/si', "\r\n$EOB;\r\nif(isset(\$_LANG[\"\\1\"])){echo <<<$EOB\r\n{\$_LANG[\"\\1\"]}\r\n$EOB;\r\n}elseif(isset(\$GLOBALS['siteConf']['tpl_debug'])&&\$GLOBALS['siteConf']['tpl_debug']){echo <<<$EOB\r\n#\\1#\r\n$EOB;\r\n}else{echo <<<$EOB\r\n\\1\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-		// 包含php文件时也会对其内容进行处理，这是不好的地方（20060301 发现未必应该有这样的担忧）
+		// {{{ include/include_once：<!--{include file.php}-->
+		// 包含php文件时也会对其内容进行处理（20060301 发现未必应该有这样的担忧）
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
 		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include_once\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", "'\r\n$EOB;\r\ninclude_once \"\\1\";echo <<<$EOB\r\n'", $s);
-		$s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_VAR_LEFT . "include_once\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT . "/is", "'\r\n$EOB;\r\ninclude_once \"\\1\";echo <<<$EOB\r\n'", $s);
+		// }}}
 		// {{{
 		/**
 		 * 下面这样可以让编译后的代码输出语句是用双引号引起来的，
