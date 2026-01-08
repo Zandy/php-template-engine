@@ -2,7 +2,7 @@
 /**
  * Zandy_Template 模板包含示例
  * 
- * 展示如何使用 {template} 和 {include} 包含其他模板
+ * 展示如何使用 <!--{template ...}--> 和 <!--{include ...}--> 包含其他模板
  */
 
 require_once __DIR__ . '/../Template.php';
