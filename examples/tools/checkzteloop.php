@@ -132,7 +132,7 @@ echo $r;
 			<td>old</td>
 		</tr>
 		<tr>
-			<td>/var/www/http/tetx/tpl/account.htm</td>
+			<td>/var/www/http/zte/tpl/account.htm</td>
 			<td>0</td>
 			<td>0</td>
 			<td>0</td>
@@ -145,7 +145,7 @@ echo $r;
 			<td>0</td>
 		</tr>
 		<tr>
-			<td>/var/www/http/tetx/tpl/address.htm</td>
+			<td>/var/www/http/zte/tpl/address.htm</td>
 			<td>2</td>
 			<td>2</td>
 			<td>0</td>

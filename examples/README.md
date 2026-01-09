@@ -190,6 +190,34 @@ php examples/api_methods_demo.php
 - `outHTML()` - 返回 HTML 文件路径或内容
 - `outEval()` - 返回可 eval 的字符串
 
+### 14. 安全使用示例
+
+```bash
+php examples/security_demo.php
+```
+
+展示：
+- 完全开放模式（默认，向后兼容）
+- 白名单模式（推荐用于生产环境）
+- 显式传递模式（最安全）
+- `includeTemplate()` 方法的使用
+- `getTemplateVars()` 辅助函数的使用
+- 不同场景的安全建议
+
+### 15. 函数和类方法内部使用示例
+
+```bash
+php examples/function_class_usage_demo.php
+```
+
+展示：
+- 函数内部使用 `outString()`（推荐显式传递）
+- 函数内部使用 `includeTemplate()`（推荐）
+- 函数内部使用 `outCache()` + `getTemplateVars()`
+- 类方法内部使用模板引擎
+- 面向过程 vs 函数内部使用的对比
+- 最佳实践建议
+
 ## 主要 API
 
 ### outString()

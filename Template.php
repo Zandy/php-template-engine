@@ -122,7 +122,76 @@ class Zandy_Template
         die();
     }
 
-    public static function out($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $cacheMod = ZANDY_TEMPLATE_CACHE_MOD_PHPC)
+    /**
+     * 根据配置提取模板变量
+     * 
+     * 支持三种模式：
+     * 1. 'open' (默认): 完全开放模式，提取所有全局变量（向后兼容）
+     * 2. 'whitelist': 白名单模式，只提取指定的变量（推荐用于生产环境）
+     * 3. 'explicit': 显式模式，只使用显式传递的变量（最安全）
+     * 
+     * 配置方式：
+     * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
+     * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data', 'items'];
+     * 
+     * @param array|null $explicitVars 显式传递的变量（优先级最高，如果提供则忽略配置）
+     * @return array 提取的变量数组
+     */
+    private static function extractTemplateVars($explicitVars = null)
+    {
+        $siteConf = isset($GLOBALS['siteConf']) ? $GLOBALS['siteConf'] : array();
+        
+        // 如果提供了显式变量，直接使用（优先级最高）
+        if ($explicitVars !== null && is_array($explicitVars)) {
+            // 始终包含 siteConf（模板引擎需要）
+            if (isset($GLOBALS['siteConf'])) {
+                $explicitVars['siteConf'] = $GLOBALS['siteConf'];
+            }
+            return $explicitVars;
+        }
+        
+        // 根据配置模式提取变量
+        $mode = isset($siteConf['template_vars_mode']) ? $siteConf['template_vars_mode'] : 'open';
+        
+        switch ($mode) {
+            case 'whitelist':
+                // 白名单模式：只提取指定的变量
+                $whitelist = isset($siteConf['template_vars_whitelist']) 
+                    ? $siteConf['template_vars_whitelist'] 
+                    : [];
+                if (empty($whitelist)) {
+                    // 如果白名单为空，回退到完全开放模式（向后兼容）
+                    return $GLOBALS;
+                }
+                $vars = [];
+                foreach ($whitelist as $key) {
+                    if (isset($GLOBALS[$key])) {
+                        $vars[$key] = $GLOBALS[$key];
+                    }
+                }
+                // 始终包含 siteConf（模板引擎需要）
+                if (isset($GLOBALS['siteConf'])) {
+                    $vars['siteConf'] = $GLOBALS['siteConf'];
+                }
+                return $vars;
+                
+            case 'explicit':
+                // 显式模式：只使用显式传递的变量
+                // 如果没有显式传递，只包含 siteConf
+                $vars = [];
+                if (isset($GLOBALS['siteConf'])) {
+                    $vars['siteConf'] = $GLOBALS['siteConf'];
+                }
+                return $vars;
+                
+            case 'open':
+            default:
+                // 完全开放模式：提取所有全局变量（默认，向后兼容）
+                return $GLOBALS;
+        }
+    }
+
+    public static function out($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $cacheMod = ZANDY_TEMPLATE_CACHE_MOD_PHPC, $vars = null)
     {
         $mods = ZANDY_TEMPLATE_CACHE_MOD_PHPC | ZANDY_TEMPLATE_CACHE_MOD_HTML | ZANDY_TEMPLATE_CACHE_MOD_EVAL;
         switch ($mods & $cacheMod) {
@@ -131,7 +200,7 @@ class Zandy_Template
                 break;
             case ZANDY_TEMPLATE_CACHE_MOD_HTML:
             case ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS:
-                return Zandy_Template::outHTML($tplFileName, $tplDir, $cacheDir, $forceRefreshCache, $mods & $cacheMod);
+                return Zandy_Template::outHTML($tplFileName, $tplDir, $cacheDir, $forceRefreshCache, $mods & $cacheMod, $vars);
                 break;
             case ZANDY_TEMPLATE_CACHE_MOD_EVAL:
                 return Zandy_Template::outEval($tplFileName, $tplDir);
@@ -142,14 +211,92 @@ class Zandy_Template
         }
     }
 
-    public static function outString($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false)
+    /**
+     * 返回填充数据后的 HTML 字符串（推荐）
+     * 
+     * @param string $tplFileName 模板文件名
+     * @param string $tplDir 模板目录
+     * @param string $cacheDir 缓存目录
+     * @param bool $forceRefreshCache 是否强制刷新缓存
+     * @param array|null $vars 显式传递的变量（可选，如果提供则只使用这些变量，忽略全局变量配置）
+     * @return string HTML 字符串
+     * 
+     * 使用示例：
+     * // 方式1：使用全局变量（向后兼容）
+     * $GLOBALS['user'] = $user;
+     * $html = Zandy_Template::outString('template.htm', $tplDir, $cacheDir);
+     * 
+     * // 方式2：显式传递变量（更安全）
+     * $html = Zandy_Template::outString('template.htm', $tplDir, $cacheDir, false, ['user' => $user]);
+     * 
+     * // 方式3：配置白名单模式
+     * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
+     * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data'];
+     * $html = Zandy_Template::outString('template.htm', $tplDir, $cacheDir);
+     */
+    public static function outString($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $vars = null)
     {
         $f = self::outCache($tplFileName, $tplDir, $cacheDir, $forceRefreshCache);
         ob_start();
-        extract($GLOBALS);
+        extract(self::extractTemplateVars($vars));
         include $f;
         $r = ob_get_clean();
         return $r;
+    }
+
+    /**
+     * 安全地 include 模板文件（推荐用于 outCache 方式）
+     * 
+     * 使用示例：
+     * // 方式1：使用全局变量（向后兼容）
+     * $GLOBALS['user'] = $user;
+     * Zandy_Template::includeTemplate('template.htm', $tplDir, $cacheDir);
+     * 
+     * // 方式2：显式传递变量（更安全，推荐用于函数/类方法内部）
+     * Zandy_Template::includeTemplate('template.htm', $tplDir, $cacheDir, false, ['user' => $user]);
+     * 
+     * // 方式3：配置白名单模式
+     * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
+     * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data'];
+     * $GLOBALS['user'] = $user;
+     * Zandy_Template::includeTemplate('template.htm', $tplDir, $cacheDir);
+     * 
+     * @param string $tplFileName 模板文件名
+     * @param string $tplDir 模板目录
+     * @param string $cacheDir 缓存目录
+     * @param bool $forceRefreshCache 是否强制刷新缓存
+     * @param array|null $vars 显式传递的变量（可选，如果提供则只使用这些变量，忽略全局变量配置）
+     */
+    public static function includeTemplate($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $vars = null)
+    {
+        $f = self::outCache($tplFileName, $tplDir, $cacheDir, $forceRefreshCache);
+        extract(self::extractTemplateVars($vars));
+        include $f;
+    }
+
+    /**
+     * 安全地提取模板变量（用于 outCache + include 方式）
+     * 
+     * 使用示例：
+     * // 方式1：显式传递变量（推荐）
+     * $cacheFile = Zandy_Template::outCache('template.htm', $tplDir, $cacheDir);
+     * extract(Zandy_Template::getTemplateVars(['user' => $user]));
+     * include $cacheFile;
+     * 
+     * // 方式2：使用配置模式
+     * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
+     * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data'];
+     * $GLOBALS['user'] = $user;
+     * $cacheFile = Zandy_Template::outCache('template.htm', $tplDir, $cacheDir);
+     * extract(Zandy_Template::getTemplateVars());  // 使用配置的白名单
+     * include $cacheFile;
+     * 
+     * @param array|null $explicitVars 显式传递的变量（可选，如果提供则只使用这些变量，忽略全局变量配置）
+     * @return array 提取的变量数组
+     */
+    public static function getTemplateVars($explicitVars = null)
+    {
+        return self::extractTemplateVars($explicitVars);
     }
 
     /**
@@ -785,11 +932,22 @@ class Zandy_Template
         return true;
     }
 
-    public static function outHTML($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $outMod = ZANDY_TEMPLATE_CACHE_MOD_HTML)
+    /**
+     * 返回 HTML 文件路径或内容
+     * 
+     * @param string $tplFileName 模板文件名
+     * @param string $tplDir 模板目录
+     * @param string $cacheDir 缓存目录
+     * @param bool $forceRefreshCache 是否强制刷新缓存
+     * @param int $outMod 输出模式
+     * @param array|null $vars 显式传递的变量（可选）
+     * @return string|false HTML 文件路径或内容
+     */
+    public static function outHTML($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $outMod = ZANDY_TEMPLATE_CACHE_MOD_HTML, $vars = null)
     {
         //global $siteConf;
         $siteConf = isset($GLOBALS['siteConf']) ? $GLOBALS['siteConf'] : array();
-        extract($GLOBALS);
+        extract(self::extractTemplateVars($vars));
         $tplDir = '' != $tplDir ? $tplDir : $siteConf['tplDir'];
         if ($cacheDir) {
             $a = pathinfo($tplFileName);
@@ -1322,10 +1480,10 @@ class Zandy_Template
     {
         if (function_exists('send_mail')) {
             $title = '<title>[Sev-2]Template Engine Error</title>';
-            $alarm_email = 'alarm2@tetx.com';
+            $alarm_email = 'alarm2@example.com';
             if (isset($GLOBALS['ON_PRODUCT']) && $GLOBALS['ON_PRODUCT']) {
                 $title = '<title>[Sev-1]Template Engine Error</title>';
-                $alarm_email = 'alarm1@tetx.com';
+                $alarm_email = 'alarm1@example.com';
             }
             $msg = $title . $msg;
             $msg .= "<hr><p>PST: " . date("Y-m-d H:i:s") . "</p><hr>";
