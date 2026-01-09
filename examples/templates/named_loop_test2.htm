@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试2: 指定 name（单层循环）</title>
+</head>
+<body>
+    <h2>指定 name 的单层循环</h2>
+    <ul>
+        <!--{loop $items AS $item name="items"}-->
+        <li class="item-{$_zte_loop_items['index']}">
+            [{$_zte_loop_items['index']}] {$item}
+            <!--{if $_zte_loop_items['first']}-->(第一个)<!--{/if}-->
+            <!--{if $_zte_loop_items['last']}-->(最后一个)<!--{/if}-->
+            (迭代: {$_zte_loop_items['iteration']}, 总数: {$_zte_loop_items['length']})
+        </li>
+        <!--{/loop}-->
+    </ul>
+</body>
+</html>

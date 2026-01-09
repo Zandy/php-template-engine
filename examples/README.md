@@ -11,14 +11,36 @@ examples/
 ├── README.md                    # 本文件
 ├── basic_usage.php              # 基础使用示例
 ├── loops_and_conditions.php     # 循环和条件语法示例
-├── template_inheritance.php      # 模板包含示例
+├── template_inheritance.php     # 模板包含示例
+├── named_loop_demo.php          # 命名循环功能演示
+├── loop_index_demo.php          # 循环索引演示
+├── switch_demo.php              # Switch 语句示例
+├── switch_case_only.php         # Switch case 示例
+├── switch_default_only.php      # Switch default 示例
+├── lang_demo.php                # 语言包功能示例
+├── include_once_demo.php        # include_once 功能示例
+├── include_demo.php             # include 功能示例
+├── foreach_demo.php            # foreach 循环示例
+├── time_and_constants_demo.php  # 时间函数和 PHP 常量示例
+├── template_comment_demo.php    # 模板注释示例
+├── api_methods_demo.php         # API 方法示例
 ├── templates/                   # 模板文件目录
 │   ├── basic.htm
 │   ├── loops.htm
 │   ├── header.htm
 │   ├── footer.htm
 │   ├── page.htm
-│   └── sidebar.htm
+│   ├── sidebar.htm
+│   ├── switch_demo.htm
+│   ├── switch_case_only.htm
+│   ├── switch_default_only.htm
+│   ├── lang_demo.htm
+│   ├── include_once_demo.htm
+│   ├── include_demo.htm
+│   ├── foreach_demo.htm
+│   ├── time_and_constants_demo.htm
+│   ├── template_comment_demo.htm
+│   └── ...
 ├── tools/                       # 工具脚本
 │   ├── checkzteloop.php        # 检查模板中 loop 语法的工具
 │   └── helper.php              # 辅助函数示例
@@ -60,6 +82,113 @@ php examples/template_inheritance.php
 - 使用 `<!--{template ...}-->` 包含其他模板
 - 使用 `<!--{include ...}-->` 包含 PHP 文件
 - 模板继承和组合
+
+### 4. 命名循环功能演示
+
+```bash
+php examples/named_loop_demo.php
+```
+
+展示：
+- 使用 `name="loopname"` 为循环命名
+- 访问循环索引信息（index, iteration, first, last, length）
+- 嵌套循环的使用
+
+### 5. 循环索引演示
+
+```bash
+php examples/loop_index_demo.php
+```
+
+展示：
+- 嵌套循环中访问不同层级的循环信息
+- 使用 `$_zte_loop_{name}` 访问循环信息
+
+### 6. Switch 语句示例
+
+```bash
+php examples/switch_demo.php
+```
+
+展示：
+- 基本 switch 语句
+- switch 支持表达式
+- break-case 和 break-default（fall-through）
+- continue 在循环中的使用
+
+### 7. 语言包功能示例
+
+```bash
+php examples/lang_demo.php
+```
+
+展示：
+- 使用 `{LANG key}` 输出语言包文本
+- 语言包不存在时的处理
+
+### 8. include_once 功能示例
+
+```bash
+php examples/include_once_demo.php
+```
+
+展示：
+- 使用 `<!--{include_once ...}-->` 确保文件只被包含一次
+
+### 9. include 功能示例
+
+```bash
+php examples/include_demo.php
+```
+
+展示：
+- 使用 `<!--{include ...}-->` 包含 PHP 文件
+- 与 `include_once` 的区别
+
+### 10. foreach 循环示例
+
+```bash
+php examples/foreach_demo.php
+```
+
+展示：
+- 使用 `<!--{foreach ...}-->` 循环语法
+- `foreach-else` 空数组处理
+
+### 11. 时间函数和 PHP 常量示例
+
+```bash
+php examples/time_and_constants_demo.php
+```
+
+展示：
+- 使用 `{time}` 输出时间戳
+- 使用 `{now}` 输出当前日期时间
+- 使用 `{date "format"}` 输出格式化日期
+- 使用 `{CONSTANT_NAME}` 输出 PHP 常量
+
+### 12. 模板注释示例
+
+```bash
+php examples/template_comment_demo.php
+```
+
+展示：
+- 使用 `<!--{*...*}-->` 添加模板注释
+- 模板注释在编译时会被移除，不会出现在最终输出中
+
+### 13. API 方法示例
+
+```bash
+php examples/api_methods_demo.php
+```
+
+展示：
+- `outString()` - 返回 HTML 字符串
+- `outCache()` - 返回缓存文件路径
+- `out()` - 通用方法，支持多种缓存模式
+- `outHTML()` - 返回 HTML 文件路径或内容
+- `outEval()` - 返回可 eval 的字符串
 
 ## 主要 API
 
@@ -228,9 +357,30 @@ $cacheFile = Zandy_Template::out('template.htm', $tplDir, $cacheDir, false, ZAND
    - 变量输出（变量、表达式、时间、常量等）使用 `{ }`
 6. **安全提示**：`<!--{php}-->` 和 `<!--{set ...}-->` 允许执行任意 PHP 代码，请确保模板来源可信
 
+## 测试
+
+运行单元测试：
+
+```bash
+# 基本功能测试
+php test/BasicFeaturesTest.php
+
+# 命名循环测试
+php test/NamedLoopTest.php
+
+# 语法检查测试
+php test/CheckSyntaxTest.php
+
+# 运行所有测试
+php test/run_tests.sh
+```
+
+详细说明请参考 [test/README.md](../test/README.md)
+
 ## 更多信息
 
 - **完整语法参考**：查看根目录的 [README.md](../README.md) 了解所有语法和功能
 - **API 文档**：根目录 README.md 包含完整的 API 参考
 - **项目主页**：查看根目录 README.md 了解项目特性和快速开始
+- **测试文档**：查看 [test/README.md](../test/README.md) 了解测试说明
 

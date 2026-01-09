@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试3: 嵌套循环（都指定 name）</title>
+</head>
+<body>
+    <h2>嵌套循环（都指定 name）</h2>
+    <ul>
+        <!--{loop $users AS $user name="users"}-->
+        <li>
+            <strong>用户 [{$_zte_loop_users['index']}]: {$user['name']}</strong>
+            <ul>
+                <!--{loop $user['posts'] AS $post name="posts"}-->
+                <li>
+                    用户索引: {$_zte_loop_users['index']},
+                    文章索引: {$_zte_loop_posts['index']},
+                    文章: {$post}
+                </li>
+                <!--{/loop}-->
+            </ul>
+        </li>
+        <!--{/loop}-->
+    </ul>
+</body>
+</html>

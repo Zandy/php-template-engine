@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{$title}</title>
+</head>
+<body>
+    <h1>{$title}</h1>
+    
+    <p>include_once 会确保文件只被包含一次，即使多次调用也不会重复包含。</p>
+    
+    <!--{include_once tools/helper.php}-->
+    
+    <p>{$content}</p>
+    
+    <!-- 再次调用 include_once，不会重复包含 -->
+    <!--{include_once tools/helper.php}-->
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试5: 混合（外层命名，内层不命名）</title>
+</head>
+<body>
+    <h2>混合：外层命名，内层不命名</h2>
+    <ul>
+        <!--{loop $users AS $user name="users"}-->
+        <li>
+            <strong>用户 [{$_zte_loop_users['index']}]: {$user['name']}</strong>
+            <ul>
+                <!--{loop $user['posts'] AS $post}-->
+                <li>
+                    用户索引: {$_zte_loop_users['index']},
+                    文章: {$post}
+                </li>
+                <!--{/loop}-->
+            </ul>
+        </li>
+        <!--{/loop}-->
+    </ul>
+</body>
+</html>

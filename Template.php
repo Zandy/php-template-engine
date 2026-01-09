@@ -884,6 +884,11 @@ class Zandy_Template
         $EOB = "TPL___________Zandy_20060218_Zandy__________TPL_" . $uniqueReplaceString;
         $EOB = 'Z_' . md5($EOB) . '_Y';
         // 终（总？）有一天，你会明白我这里为什么不用 EOF
+        // 生成唯一的循环计数器栈变量名，避免变量污染，支持嵌套循环
+        // 注意：uniqid('', true) 会生成包含小数点的字符串，需要替换为下划线才能作为变量名
+        $loopStackVar = '__zte_loop_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
+        $loopInfoStackVar = '__zte_loop_info_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
+        $loopNamesStackVar = '__zte_loop_names_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
         $tplDir = str_replace("\\", "/", $tplDir);
         $tplDir = preg_replace("/[\\/]+/", "/", $tplDir);
         $cacheDir = str_replace("\\", "/", $cacheDir);
@@ -916,26 +921,149 @@ class Zandy_Template
         // for 循环：<!--{for $i = 0; $i < 10; $i++}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "for\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nfor(\\1){echo <<<$EOB\r\n", $s);
         // foreach 循环：<!--{foreach $items as $item}-->
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "foreach\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nforeach(\\1){echo <<<$EOB\r\n", $s);
+        // 为了支持 foreach-else，需要在循环前检查数组是否为空（类似 loop 的处理）
+        // 提取数组变量名：foreach($arr as $key => $value) 或 foreach($arr as $value)
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "foreach\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB) {
+            $foreachExpr = trim($m[1]);
+            // 提取数组变量名：从 "as" 之前提取
+            if (preg_match('/^(\S+)\s+as\s+/i', $foreachExpr, $arrMatch)) {
+                $arrVar = $arrMatch[1];
+                // 生成代码：if (is_array($arr)&&sizeof($arr)>0) { foreach(...) }
+                return "\r\n$EOB;\r\nif (is_array($arrVar)&&sizeof($arrVar)>0){foreach($foreachExpr){echo <<<$EOB\r\n";
+            } else {
+                // 如果无法提取数组变量，则直接使用原表达式（向后兼容）
+                return "\r\n$EOB;\r\nforeach($foreachExpr){echo <<<$EOB\r\n";
+            }
+        }, $s);
 
         // loop 循环（简化语法，自动检查数组）：按从具体到抽象的顺序匹配
-        // <!--{loop $arr AS $key => $value}--> (最具体：包含 AS 和 =>)
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-        // <!--{loop $arr AS $value}-->
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
-        // <!--{loop $arr $key => $value}-->
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-        // <!--{loop $arr $key $value}-->
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3 => \\4){echo <<<$EOB\r\n", $s);
-        // <!--{loop $arr $value}--> (最抽象：只有数组和值)
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif (is_array(\\2)&&sizeof(\\2)>0){\$__i__=0;foreach(\\2 as \\3){echo <<<$EOB\r\n", $s);
+        // 使用栈结构支持嵌套循环，每个循环层级有独立的计数器
+        // 提供 $loop 变量供用户使用，包含 index, iteration, first, last, length 等属性
+        // 格式1: <!--{loop $arr AS $key => $value name="loopname"}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $name = isset($m[5]) && !empty($m[5]) ? $m[5] : '';
+            $name_init = $name ? '$' . $loopNamesStackVar . "[]='" . addslashes($name) . "';" . '$' . $loopInfoStackVar . "[]=array('length'=>sizeof(" . $arr . "),'index'=>-1,'iteration'=>0);" : '';
+            $name_iter = $name ? '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['index']++;" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['iteration']++;\$__zte_loop_current_info__=" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1];\$__zte_loop_current_info__['first']=(\$__zte_loop_current_info__['index']==0);\$__zte_loop_current_info__['last']=(\$__zte_loop_current_info__['index']==\$__zte_loop_current_info__['length']-1);\$_zte_loop_" . $name . "=\$__zte_loop_current_info__;" : '';
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();if(!isset(" . '$' . $loopInfoStackVar . "))" . '$' . $loopInfoStackVar . "=array();if(!isset(" . '$' . $loopNamesStackVar . "))" . '$' . $loopNamesStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
+        }, $s);
+        // 格式3: <!--{loop $arr AS $value name="loopname"}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+            $arr = $m[2];
+            $val = $m[3];
+            $name = isset($m[4]) && !empty($m[4]) ? $m[4] : '';
+            $name_init = $name ? '$' . $loopNamesStackVar . "[]='" . addslashes($name) . "';" . '$' . $loopInfoStackVar . "[]=array('length'=>sizeof(" . $arr . "),'index'=>-1,'iteration'=>0);" : '';
+            $name_iter = $name ? '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['index']++;" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['iteration']++;\$__zte_loop_current_info__=" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1];\$__zte_loop_current_info__['first']=(\$__zte_loop_current_info__['index']==0);\$__zte_loop_current_info__['last']=(\$__zte_loop_current_info__['index']==\$__zte_loop_current_info__['length']-1);\$_zte_loop_" . $name . "=\$__zte_loop_current_info__;" : '';
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();if(!isset(" . '$' . $loopInfoStackVar . "))" . '$' . $loopInfoStackVar . "=array();if(!isset(" . '$' . $loopNamesStackVar . "))" . '$' . $loopNamesStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
+        }, $s);
+        // 格式2: <!--{loop $arr AS $key $value name="loopname"}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $name = isset($m[5]) && !empty($m[5]) ? $m[5] : '';
+            $name_init = $name ? '$' . $loopNamesStackVar . "[]='" . addslashes($name) . "';" . '$' . $loopInfoStackVar . "[]=array('length'=>sizeof(" . $arr . "),'index'=>-1,'iteration'=>0);" : '';
+            $name_iter = $name ? '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['index']++;" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['iteration']++;\$__zte_loop_current_info__=" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1];\$__zte_loop_current_info__['first']=(\$__zte_loop_current_info__['index']==0);\$__zte_loop_current_info__['last']=(\$__zte_loop_current_info__['index']==\$__zte_loop_current_info__['length']-1);\$_zte_loop_" . $name . "=\$__zte_loop_current_info__;" : '';
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();if(!isset(" . '$' . $loopInfoStackVar . "))" . '$' . $loopInfoStackVar . "=array();if(!isset(" . '$' . $loopNamesStackVar . "))" . '$' . $loopNamesStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
+        }, $s);
+        // 格式4: <!--{loop $arr $key => $value name="loopname"}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $name = isset($m[5]) && !empty($m[5]) ? $m[5] : '';
+            $name_init = $name ? '$' . $loopNamesStackVar . "[]='" . addslashes($name) . "';" . '$' . $loopInfoStackVar . "[]=array('length'=>sizeof(" . $arr . "),'index'=>-1,'iteration'=>0);" : '';
+            $name_iter = $name ? '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['index']++;" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['iteration']++;\$__zte_loop_current_info__=" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1];\$__zte_loop_current_info__['first']=(\$__zte_loop_current_info__['index']==0);\$__zte_loop_current_info__['last']=(\$__zte_loop_current_info__['index']==\$__zte_loop_current_info__['length']-1);\$_zte_loop_" . $name . "=\$__zte_loop_current_info__;" : '';
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();if(!isset(" . '$' . $loopInfoStackVar . "))" . '$' . $loopInfoStackVar . "=array();if(!isset(" . '$' . $loopNamesStackVar . "))" . '$' . $loopNamesStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
+        }, $s);
+        // 格式5: <!--{loop $arr $key $value name="loopname"}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $name = isset($m[5]) && !empty($m[5]) ? $m[5] : '';
+            $name_init = $name ? '$' . $loopNamesStackVar . "[]='" . addslashes($name) . "';" . '$' . $loopInfoStackVar . "[]=array('length'=>sizeof(" . $arr . "),'index'=>-1,'iteration'=>0);" : '';
+            $name_iter = $name ? '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['index']++;" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['iteration']++;\$__zte_loop_current_info__=" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1];\$__zte_loop_current_info__['first']=(\$__zte_loop_current_info__['index']==0);\$__zte_loop_current_info__['last']=(\$__zte_loop_current_info__['index']==\$__zte_loop_current_info__['length']-1);\$_zte_loop_" . $name . "=\$__zte_loop_current_info__;" : '';
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();if(!isset(" . '$' . $loopInfoStackVar . "))" . '$' . $loopInfoStackVar . "=array();if(!isset(" . '$' . $loopNamesStackVar . "))" . '$' . $loopNamesStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
+        }, $s);
+        // 格式6: <!--{loop $arr $value name="loopname"}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+            $arr = $m[2];
+            $val = $m[3];
+            $name = isset($m[4]) && !empty($m[4]) ? $m[4] : '';
+            $name_init = $name ? '$' . $loopNamesStackVar . "[]='" . addslashes($name) . "';" . '$' . $loopInfoStackVar . "[]=array('length'=>sizeof(" . $arr . "),'index'=>-1,'iteration'=>0);" : '';
+            $name_iter = $name ? '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['index']++;" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1]['iteration']++;\$__zte_loop_current_info__=" . '$' . $loopInfoStackVar . "[count(" . '$' . $loopInfoStackVar . ")-1];\$__zte_loop_current_info__['first']=(\$__zte_loop_current_info__['index']==0);\$__zte_loop_current_info__['last']=(\$__zte_loop_current_info__['index']==\$__zte_loop_current_info__['length']-1);\$_zte_loop_" . $name . "=\$__zte_loop_current_info__;" : '';
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();if(!isset(" . '$' . $loopInfoStackVar . "))" . '$' . $loopInfoStackVar . "=array();if(!isset(" . '$' . $loopNamesStackVar . "))" . '$' . $loopNamesStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
+        }, $s);
+        // 格式7: <!--{loop $arr AS $key => $value}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
+        }, $s);
+        // 格式8: <!--{loop $arr AS $key $value}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
+        }, $s);
+        // 格式9: <!--{loop $arr AS $value}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+            $arr = $m[2];
+            $val = $m[3];
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
+        }, $s);
+        // 格式10: <!--{loop $arr $key => $value}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
+        }, $s);
+        // 格式11: <!--{loop $arr $key $value}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+            $arr = $m[2];
+            $key = $m[3];
+            $val = $m[4];
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
+        }, $s);
+        // 格式12: <!--{loop $arr $value}-->
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+            $arr = $m[2];
+            $val = $m[3];
+            $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
+            return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
+        }, $s);
 
         // 循环的 else 分支：<!--{loop-else}-->, <!--{foreach-else}-->, <!--{for-else}-->
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop-else|foreach-else|for-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop|foreach|for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}else{echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
+        // loop-else：出栈并判断：如果计数器为0，执行else分支，并闭合 if (is_array) 大括号
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}if(isset(" . '$' . $loopStackVar . ")&&count(" . '$' . $loopStackVar . ")>0){\$__zte_loop_count__=array_pop(" . '$' . $loopStackVar . ");if(isset(" . '$' . $loopNamesStackVar . ")&&count(" . '$' . $loopNamesStackVar . ")>0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopNamesStackVar . ");}if(isset(" . '$' . $loopInfoStackVar . ")&&count(" . '$' . $loopInfoStackVar . ")>0 && isset(" . '$' . $loopNamesStackVar . ") && count(" . '$' . $loopNamesStackVar . ") > 0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopInfoStackVar . ");}if(\$__zte_loop_count__==0){echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}}}echo <<<$EOB\r\n", $s);
+        // foreach-else：由于 foreach 已经包含数组检查，这里只需要添加 else 分支
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(foreach-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}}else{echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
+        // for-else：for 循环不支持 else，但为了语法一致性，提供空实现
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(for-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
         // 循环结束标签
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif(isset(\$__i__))\$__i__++;}if(isset(\$__i__))unset(\$__i__);}echo <<<$EOB\r\n", $s);
+        // 出栈：移除当前循环层级的计数器、循环名字和循环信息，并闭合 if (is_array) 大括号
+        // 注意：只有当栈中有对应元素时才弹出（避免内层无name的循环错误弹出外层循环信息）
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}if(isset(" . '$' . $loopStackVar . ")&&count(" . '$' . $loopStackVar . ")>0){array_pop(" . '$' . $loopStackVar . ");}if(isset(" . '$' . $loopNamesStackVar . ")&&count(" . '$' . $loopNamesStackVar . ")>0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopNamesStackVar . ");}if(isset(" . '$' . $loopInfoStackVar . ")&&count(" . '$' . $loopInfoStackVar . ")>0 && isset(" . '$' . $loopNamesStackVar . ") && count(" . '$' . $loopNamesStackVar . ") > 0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopInfoStackVar . ");}}echo <<<$EOB\r\n", $s);
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
+        // foreach 结束标签：需要闭合 if 和 foreach 的大括号
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}}echo <<<$EOB\r\n", $s);
 
         // === 条件语句 ===
         // if 条件：<!--{if $condition}-->
@@ -949,7 +1077,8 @@ class Zandy_Template
 
         // === Switch 语句 ===
         // switch 开始：<!--{switch $value}--> (支持表达式，使用 .+? 而非 \S+)
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "switch\\s+(.+?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nswitch(\\1){echo <<<$EOB\r\n", $s);
+        // 注意：switch 后不能有 echo，必须直接是 case 或 default
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "switch\\s+(.+?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nswitch(\\1){\r\n", $s);
         // break-case：<!--{break-case $value}--> (必须在 case 之前匹配，更具体)
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "break-case\\s+(.+?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nbreak;case \\1:echo <<<$EOB\r\n", $s);
         // break-default：<!--{break-default}--> (必须在 default 之前匹配，更具体；default 不需要参数)
@@ -958,6 +1087,11 @@ class Zandy_Template
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "case\\s+(.+?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\ncase \\1:echo <<<$EOB\r\n", $s);
         // default：<!--{default}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(default)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1:echo <<<$EOB\r\n", $s);
+        // 清理 switch 和第一个 case/default 之间的所有内容（包括空白、换行、heredoc等）
+        // 必须在 case 和 default 都替换后执行，确保标签已被替换
+        // 匹配 switch(...){ 后面到第一个 case 或 default 之间的所有内容（包括 heredoc 结束标记）
+        // 使用更宽松的匹配，匹配任何字符直到遇到 case 或 default
+        $s = preg_replace("/(switch\([^)]+\)\{)\s*" . preg_quote($EOB, '/') . ";\s*(?=case|default)/s", "\\1\r\n", $s);
         // continue：<!--{continue}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(continue)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
         // break：<!--{break}--> (必须在 break-case/break-default 之后匹配，更抽象)

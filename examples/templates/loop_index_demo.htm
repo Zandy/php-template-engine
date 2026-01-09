@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>循环索引演示</title>
+</head>
+<body>
+    <h1>嵌套循环示例（使用命名循环）</h1>
+    <ul>
+        <!--{loop $users AS $user name="users"}-->
+        <li>
+            <strong>{$user['name']}</strong>
+            <ul>
+                <!--{loop $user AS $key => $value name="items"}-->
+                <li>
+                    外层循环索引: {$_zte_loop_users['index']},
+                    当前层循环索引: {$_zte_loop_items['index']},
+                    内层键: {$key},
+                    内层值: {$value}
+                </li>
+                <!--{/loop}-->
+            </ul>
+        </li>
+        <!--{/loop}-->
+    </ul>
+</body>
+</html>

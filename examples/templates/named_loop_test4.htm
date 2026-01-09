@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试4: 三层嵌套循环</title>
+</head>
+<body>
+    <h2>三层嵌套循环</h2>
+    <ul>
+        <!--{loop $users AS $user name="users"}-->
+        <li>
+            <strong>用户 [{$_zte_loop_users['index']}]: {$user['name']}</strong>
+            <ul>
+                <!--{loop $user['posts'] AS $post name="posts"}-->
+                <li>
+                    用户: {$_zte_loop_users['index']},
+                    文章: {$_zte_loop_posts['index']},
+                    文章内容: {$post}
+                </li>
+                <!--{/loop}-->
+            </ul>
+        </li>
+        <!--{/loop}-->
+    </ul>
+</body>
+</html>

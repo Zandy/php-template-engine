@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Switch 语句示例</title>
+</head>
+<body>
+    <h1>Switch 语句示例</h1>
+    
+    <h2>1. 基本 Switch 语句</h2>
+    <!--{switch $status}--><!--{case 1}-->
+        <p>状态为 1</p>
+    <!--{break}--><!--{case 2}-->
+        <p>状态为 2</p>
+    <!--{break}--><!--{default}-->
+        <p>其他状态</p>
+    <!--{/switch}-->
+    
+    <h2>2. Switch 支持表达式</h2>
+    <!--{switch $value * 2}--><!--{case 10}-->
+        <p>值为 10 (5 * 2)</p>
+    <!--{break}--><!--{case 20}-->
+        <p>值为 20</p>
+    <!--{break}--><!--{default}-->
+        <p>其他值</p>
+    <!--{/switch}-->
+    
+    <h2>3. break-case (fall-through)</h2>
+    <!--{switch $day}--><!--{case 1}-->
+        <p>星期一</p>
+    <!--{break-case 2}-->
+        <p>星期二</p>
+    <!--{break-case 3}-->
+        <p>星期三</p>
+    <!--{case 4}-->
+        <p>星期四</p>
+    <!--{break}--><!--{default}-->
+        <p>周末</p>
+    <!--{/switch}-->
+    
+    <h2>4. break-default (fall-through)</h2>
+    <!--{switch $value}--><!--{case 1}-->
+        <p>值为 1</p>
+    <!--{break-default}-->
+        <p>默认值（fall-through）</p>
+    <!--{/switch}-->
+    
+    <h2>5. continue 在循环中使用</h2>
+    <!--{loop $items AS $item name="items"}-->
+        <!--{if $_zte_loop_items['index'] == 1}-->
+            <!--{continue}-->
+        <!--{/if}-->
+        <p>项目 {$_zte_loop_items['index']}: {$item}</p>
+    <!--{/loop}-->
+</body>
+</html>

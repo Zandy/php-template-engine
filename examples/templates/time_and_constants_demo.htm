@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{$title}</title>
+</head>
+<body>
+    <h1>{$title}</h1>
+    
+    <h2>时间函数</h2>
+    
+    <h3>1. {time} - 当前时间戳</h3>
+    <p>当前时间戳: {time}</p>
+    
+    <h3>2. {now} - 当前日期时间</h3>
+    <p>当前日期时间: {now}</p>
+    
+    <h3>3. {date "format"} - 格式化日期</h3>
+    <p>日期 (Y-m-d): {date "Y-m-d"}</p>
+    <p>日期时间 (Y-m-d H:i:s): {date "Y-m-d H:i:s"}</p>
+    <p>年份: {date "Y"}</p>
+    <p>月份: {date "m"}</p>
+    <p>星期: {date "l"}</p>
+    
+    <h2>PHP 常量</h2>
+    
+    <h3>1. PHP 版本</h3>
+    <p>PHP 版本: {PHP_VERSION}</p>
+    
+    <h3>2. PHP 操作系统</h3>
+    <p>操作系统: {PHP_OS}</p>
+    
+    <h3>3. 目录分隔符</h3>
+    <p>目录分隔符: {DIRECTORY_SEPARATOR}</p>
+    
+    <h3>4. 路径分隔符</h3>
+    <p>路径分隔符: {PATH_SEPARATOR}</p>
+    
+    <h3>5. 行结束符</h3>
+    <p>行结束符: {PHP_EOL} (不可见，但已输出)</p>
+    
+    <h2>组合使用</h2>
+    <p>当前时间: {now} (时间戳: {time})</p>
+    <p>运行环境: PHP {PHP_VERSION} on {PHP_OS}</p>
+</body>
+</html>

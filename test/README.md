@@ -1,6 +1,51 @@
-# check_syntax 单元测试说明
+# Zandy_Template 单元测试说明
 
 ## 概述
+
+本测试套件包含多个测试文件，用于验证 Zandy_Template 模板引擎的各项功能：
+
+1. **BasicFeaturesTest.php** - 基本功能测试（变量输出、循环、条件、Switch、时间函数、常量等）
+2. **NamedLoopTest.php** - 命名循环功能测试
+3. **CheckSyntaxTest.php** - 语法检查方法测试
+
+## BasicFeaturesTest.php
+
+测试模板引擎的基本功能，包括：
+- 变量输出
+- 时间函数（{time}, {now}, {date}）
+- PHP 常量（{CONSTANT_NAME}）
+- echo 表达式（{echo ...}）
+- 语言包（{LANG key}）
+- 循环（loop, for, foreach）
+- 循环 else 分支（loop-else, foreach-else, for-else）
+- 条件判断（if, elseif, else）
+- Switch 语句（switch, case, default, break-case, break-default, break, continue）
+- 模板包含（template）
+- 文件包含（include, include_once）
+- PHP 代码块（<!--{php}-->...<!--{/php}-->）
+- set 变量（<!--{set ...}-->）
+- 模板注释（<!--{*...*}-->）
+
+**运行方法：**
+```bash
+php test/BasicFeaturesTest.php
+```
+
+## NamedLoopTest.php
+
+测试命名循环功能，包括：
+- 不指定 name（向后兼容）
+- 指定 name（单层循环）
+- 嵌套循环（都指定 name）
+- 混合（外层命名，内层不命名）
+- 语法检查
+
+**运行方法：**
+```bash
+php test/NamedLoopTest.php
+```
+
+## CheckSyntaxTest.php
 
 本测试套件用于验证 `Zandy_Template::check_syntax()` 方法及其相关改进的正确性，确保：
 1. 优先级逻辑正确（opcache > php-cli > eval）
@@ -13,11 +58,13 @@
 
 ### 本地测试
 ```bash
-# 直接运行
-php test/CheckSyntaxTest.php
-
-# 或使用脚本（Unix/Linux/macOS）
+# 运行所有测试
 ./test/run_tests.sh
+
+# 或单独运行
+php test/BasicFeaturesTest.php
+php test/NamedLoopTest.php
+php test/CheckSyntaxTest.php
 ```
 
 ### Docker 多版本测试（推荐用于兼容性测试）
