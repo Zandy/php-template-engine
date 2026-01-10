@@ -1200,21 +1200,37 @@ class Zandy_Template
      */
     public static function parse($s, $tplDir = '', $cacheDir = '')
     {
+        // {{{ 阶段 1: 初始化解析上下文
+        // 生成唯一的 EOB (End Of Block) 标识符，用于 heredoc 语法
+        // 注意：使用 EOB 而非 EOF 是为了避免与 PHP 内置的 EOF 冲突
         $uniqueReplaceString = md5(serialize(microtime())) . "_TPL___________Zandy_20060218_Zandy__________TPL_" . time() . mt_rand(0, 999999);
         $EOB = "TPL___________Zandy_20060218_Zandy__________TPL_" . $uniqueReplaceString;
         $EOB = 'Z_' . md5($EOB) . '_Y';
-        // 终（总？）有一天，你会明白我这里为什么不用 EOF
+        
         // 生成唯一的循环计数器栈变量名，避免变量污染，支持嵌套循环
         // 注意：uniqid('', true) 会生成包含小数点的字符串，需要替换为下划线才能作为变量名
         $loopStackVar = '__zte_loop_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
         $loopInfoStackVar = '__zte_loop_info_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
         $loopNamesStackVar = '__zte_loop_names_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
+        
+        // 规范化路径格式
         $tplDir = Zandy_Template::normalizePath($tplDir);
         $cacheDir = Zandy_Template::normalizePath($cacheDir);
-        // 去掉注释（模板语法的注释），具体语法为 <!--{*这是注释内容*}-->
+        // }}}
+        
+        // {{{ 阶段 2: 预处理模板内容
+        // 移除模板注释：<!--{*这是注释内容*}-->
+        // 模板注释在编译时会被移除，不会出现在最终输出中
         $s = preg_replace("/\\<\\!\\-\\-\\{\\*.*\\*\\}\\-\\-\\>/isU", '', $s);
+        
+        // 将模板内容包装为 heredoc 语法，便于后续处理
+        // 使用 heredoc 可以安全地处理包含特殊字符的内容
         $s = "echo <<<$EOB\r\n" . $s . "\r\n$EOB;\r\n";
-        // {{{ 处理模板包含：<!--{template header.htm}-->
+        // }}}
+        
+        // {{{ 阶段 3: 处理模板包含
+        // 语法：<!--{template header.htm}-->
+        // 功能：包含其他模板文件，支持相对路径
         // 注意：逻辑控制语句统一使用 <!--{ }--> 分隔符，浏览器预览时不会破坏 HTML 结构
         $m = array();
         preg_match_all("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "template\\s+([^\\}\\s]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", $s, $m);
@@ -1225,22 +1241,34 @@ class Zandy_Template
             }
         }
         // }}}
-        // {{{ php 代码块：<!--{php}-->...<!--{/php}-->
-        // 支持块级 PHP 代码，浏览器预览时不会破坏 HTML 结构
+        
+        // {{{ 阶段 4: 处理 PHP 代码块和变量设置
+        // 语法：<!--{php}-->...<!--{/php}-->
+        // 功能：执行块级 PHP 代码
+        // 注意：支持块级 PHP 代码，浏览器预览时不会破坏 HTML 结构
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "php" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/php" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
-        // }}}
-        // {{{ set 变量：<!--{set $var = value}-->
+        
+        // 语法：<!--{set $var = 'value'}-->
+        // 功能：设置变量（语法糖，用于简化变量赋值）
+        // 等价于：<!--{php}-->$var = 'value';<!--{/php}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "set\\s(.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
         // }}}
-        // {{{ logic
-        // 逻辑控制语句处理：按功能分组，按匹配优先级排序（从具体到抽象）
-
-        // === 循环语句 ===
-        // for 循环：<!--{for $i = 0; $i < 10; $i++}-->
+        
+        // {{{ 阶段 5: 处理循环语句
+        // 说明：循环语句处理按匹配优先级排序（从具体到抽象），确保正确匹配
+        // 支持的循环类型：for, foreach, loop（12种格式）
+        //
+        // --- 5.1 for 循环 ---
+        // 语法：<!--{for $i = 0; $i < 10; $i++}-->
+        // 功能：标准 PHP for 循环
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "for\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\nfor(\\1){echo <<<$EOB\r\n", $s);
-        // foreach 循环：<!--{foreach $items as $item}-->
-        // 为了支持 foreach-else，需要在循环前检查数组是否为空（类似 loop 的处理）
-        // 提取数组变量名：foreach($arr as $key => $value) 或 foreach($arr as $value)
+        
+        // --- 5.2 foreach 循环 ---
+        // 语法：<!--{foreach $items as $item}-->
+        // 功能：标准 PHP foreach 循环，支持 foreach-else
+        // 说明：
+        //   - 为了支持 foreach-else，需要在循环前检查数组是否为空（类似 loop 的处理）
+        //   - 提取数组变量名：foreach($arr as $key => $value) 或 foreach($arr as $value)
         $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "foreach\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB) {
             $foreachExpr = trim($m[1]);
             // 提取数组变量名：从 "as" 之前提取
@@ -1254,9 +1282,15 @@ class Zandy_Template
             }
         }, $s);
 
-        // loop 循环（简化语法，自动检查数组）：按从具体到抽象的顺序匹配
-        // 使用栈结构支持嵌套循环，每个循环层级有独立的计数器
-        // 提供 $loop 变量供用户使用，包含 index, iteration, first, last, length 等属性
+        // --- 5.3 loop 循环（12种格式）---
+        // 语法：<!--{loop $arr AS $key => $value}--> 或 <!--{loop $arr $value}-->
+        // 功能：简化语法，自动检查数组，支持命名循环和循环索引信息
+        // 说明：
+        //   - 使用栈结构支持嵌套循环，每个循环层级有独立的计数器
+        //   - 支持 name="loopname" 参数，生成 $_zte_loop_{name} 变量
+        //   - 提供循环索引信息：index, iteration, first, last, length
+        //   - 按从具体到抽象的顺序匹配，确保正确解析
+        //
         // 格式1: <!--{loop $arr AS $key => $value name="loopname"}-->
         $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
             $arr = $m[2];
@@ -1369,23 +1403,33 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
         }, $s);
 
-        // 循环的 else 分支：<!--{loop-else}-->, <!--{foreach-else}-->, <!--{for-else}-->
-        // loop-else：出栈并判断：如果计数器为0，执行else分支，并闭合 if (is_array) 大括号
-        // 当数组为空时，在栈中推入计数器0，以便 loop-else 能正确检测空数组情况
+        // --- 5.4 循环的 else 分支 ---
+        // 语法：<!--{loop-else}-->, <!--{foreach-else}-->, <!--{for-else}-->
+        // 功能：当循环数组为空时执行 else 分支
+        // 说明：
+        //   - loop-else：出栈并判断，如果计数器为0，执行else分支
+        //   - 当数组为空时，在栈中推入计数器0，以便 loop-else 能正确检测空数组情况
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}}else{if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();" . '$' . $loopStackVar . "[]=0;}if(isset(" . '$' . $loopStackVar . ")&&count(" . '$' . $loopStackVar . ")>0){\$__zte_loop_count__=array_pop(" . '$' . $loopStackVar . ");if(isset(" . '$' . $loopNamesStackVar . ")&&count(" . '$' . $loopNamesStackVar . ")>0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopNamesStackVar . ");}if(isset(" . '$' . $loopInfoStackVar . ")&&count(" . '$' . $loopInfoStackVar . ")>0 && isset(" . '$' . $loopNamesStackVar . ") && count(" . '$' . $loopNamesStackVar . ") > 0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopInfoStackVar . ");}if(\$__zte_loop_count__==0){echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}}echo <<<$EOB\r\n", $s);
         // foreach-else：由于 foreach 已经包含数组检查，这里只需要添加 else 分支
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(foreach-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}}else{echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
         // for-else：for 循环不支持 else，但为了语法一致性，提供空实现
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(for-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-        // 循环结束标签
-        // 出栈：移除当前循环层级的计数器、循环名字和循环信息，并闭合 if (is_array) 大括号
-        // 注意：只有当栈中有对应元素时才弹出（避免内层无name的循环错误弹出外层循环信息）
+        
+        // --- 5.5 循环结束标签 ---
+        // 语法：<!--{/loop}-->, <!--{/for}-->, <!--{/foreach}-->
+        // 功能：结束循环，出栈循环计数器
+        // 说明：
+        //   - 出栈：移除当前循环层级的计数器、循环名字和循环信息
+        //   - 注意：只有当栈中有对应元素时才弹出（避免内层无name的循环错误弹出外层循环信息）
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}if(isset(" . '$' . $loopStackVar . ")&&count(" . '$' . $loopStackVar . ")>0){array_pop(" . '$' . $loopStackVar . ");}if(isset(" . '$' . $loopNamesStackVar . ")&&count(" . '$' . $loopNamesStackVar . ")>0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopNamesStackVar . ");}if(isset(" . '$' . $loopInfoStackVar . ")&&count(" . '$' . $loopInfoStackVar . ")>0 && isset(" . '$' . $loopNamesStackVar . ") && count(" . '$' . $loopNamesStackVar . ") > 0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopInfoStackVar . ");}}echo <<<$EOB\r\n", $s);
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(for)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
         // foreach 结束标签：需要闭合 if 和 foreach 的大括号
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}}echo <<<$EOB\r\n", $s);
-
-        // === 条件语句 ===
+        // }}}
+        
+        // {{{ 阶段 6: 处理条件语句
+        // 语法：<!--{if $condition}-->, <!--{elseif $other}-->, <!--{else}-->, <!--{/if}-->
+        // 功能：条件判断，支持完整 PHP 表达式
         // if 条件：<!--{if $condition}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "if (.*?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nif (\\1){echo <<<$EOB\r\n", $s);
         // elseif 条件：<!--{elseif $other}-->
@@ -1394,14 +1438,20 @@ class Zandy_Template
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}\\1{echo <<<$EOB\r\n", $s);
         // if 结束标签：<!--{/if}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/if" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-
-        // === Switch 语句 ===
+        // }}}
+        
+        // {{{ 阶段 7: 处理 Switch 语句
+        // 语法：<!--{switch $value}-->, <!--{case $value}-->, <!--{default}-->, <!--{break}-->, <!--{/switch}-->
+        // 功能：Switch 语句，支持表达式，支持 fall-through（break-case, break-default）
+        //
         // switch 开始：<!--{switch $value}--> (支持表达式，使用 .+? 而非 \S+)
         // 注意：switch 后不能有 echo，必须直接是 case 或 default
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "switch\\s+(.+?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nswitch(\\1){\r\n", $s);
         // break-case：<!--{break-case $value}--> (必须在 case 之前匹配，更具体)
+        // 功能：break 后继续执行下一个 case（fall-through）
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "break-case\\s+(.+?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nbreak;case \\1:echo <<<$EOB\r\n", $s);
         // break-default：<!--{break-default}--> (必须在 default 之前匹配，更具体；default 不需要参数)
+        // 功能：break 后继续执行 default（fall-through）
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "break-default" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\nbreak;default:echo <<<$EOB\r\n", $s);
         // case：<!--{case $value}--> (支持表达式)
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "case\\s+(.+?)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\ncase \\1:echo <<<$EOB\r\n", $s);
@@ -1413,28 +1463,45 @@ class Zandy_Template
         // 使用更宽松的匹配，匹配任何字符直到遇到 case 或 default
         $s = preg_replace("/(switch\([^)]+\)\{)\s*" . preg_quote($EOB, '/') . ";\s*(?=case|default)/s", "\\1\r\n", $s);
         // continue：<!--{continue}-->
+        // 功能：循环控制（在循环中使用）
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(continue)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
         // break：<!--{break}--> (必须在 break-case/break-default 之后匹配，更抽象)
+        // 功能：跳出当前 case 或循环
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(break)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n\\1;echo <<<$EOB\r\n", $s);
         // switch 结束标签：<!--{/switch}-->
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/switch" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/si", "\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
         // }}}
-        // {{{ 变量输出语法：使用 { } 分隔符
-        // 注意：变量输出使用 { } 分隔符，不会破坏 HTML 结构
+        
+        // {{{ 阶段 8: 处理变量输出
+        // 说明：变量输出使用 { } 分隔符，不会破坏 HTML 结构
+        // 支持的语法：{$var}, {time}, {now}, {date}, {echo}, {CONSTANT_NAME}
+        //
+        // 注意：过滤器功能可通过 {echo} 语法实现，例如：
+        //   - {echo htmlspecialchars($variable)} 等价于 {$variable|escape}
+        //   - {echo strtoupper($variable)} 等价于 {$variable|upper}
+        //   - {echo substr($variable, 0, 50)} 等价于 {$variable|truncate:50}
 
-        // 对时间简写的支持 20060704
+        // 时间函数：{time}, {now}, {date "Y-m-d"}
+        // 功能：输出时间相关函数结果
         $s = preg_replace("/\\{time\\}/si", "\r\n$EOB;\r\necho time();echo <<<$EOB\r\n", $s);
         $s = preg_replace("/\\{now\\}/si", "\r\n$EOB;\r\necho date(\"Y-m-d H:i:s\");echo <<<$EOB\r\n", $s);
         $s = preg_replace("/\\{date ([\"|'])([^'\"\\}]+)\\1\\}/is", "\r\n$EOB;\r\necho date(\\1\\2\\1);echo <<<$EOB\r\n", $s);
 
-        // 输出 PHP 常量：{CONSTANT_NAME}
+        // PHP 常量：{CONSTANT_NAME}
+        // 功能：输出 PHP 常量（全大写+下划线格式）
         $s = preg_replace("/\\{([A-Z_]+)\\}/s", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
 
-        // echo 表达式：{echo expression} - 直接输出表达式结果
-        // 支持 {echo "afd"} {echo $dafda} {echo $fda['fda']}，但不支持里面有换行符 \r \n
-        // 注意：只匹配空格，不匹配制表符和换行符
+        // echo 表达式：{echo expression}
+        // 功能：直接输出表达式结果，支持复杂表达式和函数调用
+        // 说明：
+        //   - 支持 {echo "afd"} {echo $dafda} {echo $fda['fda']}
+        //   - 不支持里面有换行符 \r \n
+        //   - 注意：只匹配空格，不匹配制表符和换行符
+        //   - 可用于实现过滤器功能：{echo htmlspecialchars(strtoupper($var))}
+        //     例如：{echo htmlspecialchars($variable)} 等价于 {$variable|escape}
+        //          {echo strtoupper($variable)} 等价于 {$variable|upper}
+        //          {echo substr($variable, 0, 50)} 等价于 {$variable|truncate:50}
         $s = preg_replace("/\\{echo +([^\r\n}]+)\\}/i", "\r\n$EOB;\r\necho \\1;echo <<<$EOB\r\n", $s);
-        // }}}
         /*
         // {{{ 数组的简单访问方式支持 e.g. {arr key1 num2 key3} 解析后为 {$arr['key1'][num2]['key3']}
         $m = array();
@@ -1462,21 +1529,35 @@ class Zandy_Template
         }
         // }}}
         */
-        // 语言包：{LANG key}
+        // }}}
+        
+        // {{{ 阶段 9: 处理语言包
+        // 语法：{LANG key}
+        // 功能：输出语言包文本
+        // 说明：
+        //   - 如果语言包存在，输出对应的文本
+        //   - 如果语言包不存在且开启调试模式，输出 #key#
+        //   - 如果语言包不存在且未开启调试模式，输出 key 本身
         $s = preg_replace('/\{LANG (.+?)\}/si', "\r\n$EOB;\r\nif(isset(\$_LANG[\"\\1\"])){echo <<<$EOB\r\n{\$_LANG[\"\\1\"]}\r\n$EOB;\r\n}elseif(isset(\$GLOBALS['siteConf']['tpl_debug'])&&\$GLOBALS['siteConf']['tpl_debug']){echo <<<$EOB\r\n#\\1#\r\n$EOB;\r\n}else{echo <<<$EOB\r\n\\1\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
-        // {{{ include/include_once：<!--{include file.php}-->
-        // 包含php文件时也会对其内容进行处理（20060301 发现未必应该有这样的担忧）
+        // }}}
+        
+        // {{{ 阶段 10: 处理文件包含
+        // 语法：<!--{include file.php}-->, <!--{include_once file.php}-->
+        // 功能：包含 PHP 文件
+        // 说明：包含php文件时也会对其内容进行处理（20060301 发现未必应该有这样的担忧）
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", "'\r\n$EOB;\r\ninclude \"\\1\";echo <<<$EOB\r\n'", $s);
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "include_once\\s+([^\\}]+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/is", "'\r\n$EOB;\r\ninclude_once \"\\1\";echo <<<$EOB\r\n'", $s);
         // }}}
-        // {{{
+        
+        // {{{ 阶段 11: 返回解析结果
+        // 注意：以下代码已注释，保留用于未来可能的优化
+        // 功能：将 heredoc 转换为双引号字符串（可选优化）
+        // 说明：
+        //   - 可以通过配置 $GLOBALS['siteConf']['EOF'] 控制是否启用
+        //   - 启用后模板里的变量不能含有双引号，{$al['article_id']} 不能写为 {$al["article_id"]}
         /*
-         * 下面这样可以让编译后的代码输出语句是用双引号引起来的，
-         * 不要也没任何问题($GLOBALS['siteConf']['EOF'] 的需要设为 0 或 1)
-         * 这里需要注意的是模板里的变量不能含有双引号了，{$al['article_id']} 不能写为 {$al["article_id"]}
         if (ZANDY_TEMPLATE_CACHE_SIMPLE ^ intval(isset($GLOBALS['siteConf']) && isset($GLOBALS['siteConf']['EOF']) && $GLOBALS['siteConf']['EOF']))
         {
-            //$s = str_replace("/echo \<\<\<$EOB"."\r\n(.+)\r\n$EOB".";\r\n/iUs", "echo \"\\1\";", $s);
             $m = array();
             preg_match_all("/echo \<\<\<$EOB" . "\r\n(.+)\r\n$EOB" . ";\r\n/iUs", $s, $m);
             if (is_array($m[0]) && is_array($m[1]))
@@ -1493,9 +1574,9 @@ class Zandy_Template
                 }
             }
         }
-         */
+        */
         // }}}
-        //p($s);//die();
+        
         return $s;
     }
 
