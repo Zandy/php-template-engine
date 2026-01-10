@@ -383,7 +383,7 @@ $cacheFile = Zandy_Template::out('template.htm', $tplDir, $cacheDir, false, ZAND
 5. **分隔符规范**：
    - 逻辑控制语句（if, for, loop, template, include, php, set 等）使用 `<!--{ }-->`
    - 变量输出（变量、表达式、时间、常量等）使用 `{ }`
-6. **安全提示**：`<!--{php}-->` 和 `<!--{set ...}-->` 允许执行任意 PHP 代码，请确保模板来源可信
+6. **安全提示**：`<!--{php}-->` 允许执行任意 PHP 代码，`<!--{set ...}-->` 是语法糖用于简化变量赋值（如 `<!--{set $var = 'value'}-->` 替代 `<!--{php}-->$var = 'value';<!--{/php}-->`），请确保模板来源可信
 
 ## 测试
 

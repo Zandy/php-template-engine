@@ -23,6 +23,26 @@ echo "3. 运行语法检查测试..."
 php CheckSyntaxTest.php
 echo ""
 
+# 运行 API 方法测试
+echo "4. 运行 API 方法测试..."
+php ApiMethodsTest.php
+echo ""
+
+# 运行变量访问控制测试
+echo "5. 运行变量访问控制测试..."
+php VariableAccessControlTest.php
+echo ""
+
+# 运行边界情况测试
+echo "6. 运行边界情况测试..."
+php EdgeCasesTest.php
+echo ""
+
+# 运行性能测试
+echo "7. 运行性能测试..."
+php PerformanceTest.php
+echo ""
+
 echo "=========================================="
 echo "所有测试完成"
 echo "=========================================="

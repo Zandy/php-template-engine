@@ -6,96 +6,96 @@ services:
   #   volumes:
   #     - .:/app
   #   working_dir: /app
-  #   command: php test/CheckSyntaxTest.php
+  #   command: bash test/run_tests.sh
 
   # php54:
   #   image: php:5.4-cli
   #   volumes:
   #     - .:/app
   #   working_dir: /app
-  #   command: php test/CheckSyntaxTest.php
+  #   command: bash test/run_tests.sh
 
   # php55:
   #   image: php:5.5-cli
   #   volumes:
   #     - .:/app
   #   working_dir: /app
-  #   command: php test/CheckSyntaxTest.php
+  #   command: bash test/run_tests.sh
 
   php56:
     image: php:5.6-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php70:
     image: php:7.0-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php71:
     image: php:7.1-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php72:
     image: php:7.2-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php73:
     image: php:7.3-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php74:
     image: php:7.4-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php80:
     image: php:8.0-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php81:
     image: php:8.1-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php82:
     image: php:8.2-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php83:
     image: php:8.3-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 
   php84:
     image: php:8.4-cli
     volumes:
       - .:/app
     working_dir: /app
-    command: php test/CheckSyntaxTest.php
+    command: bash test/run_tests.sh
 

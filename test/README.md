@@ -7,6 +7,10 @@
 1. **BasicFeaturesTest.php** - 基本功能测试（变量输出、循环、条件、Switch、时间函数、常量等）
 2. **NamedLoopTest.php** - 命名循环功能测试
 3. **CheckSyntaxTest.php** - 语法检查方法测试
+4. **ApiMethodsTest.php** - API 方法测试（outString、outCache、includeTemplate 等）
+5. **VariableAccessControlTest.php** - 变量访问控制测试（open/whitelist/explicit 模式）
+6. **EdgeCasesTest.php** - 边界情况测试（空数组、null 值、大文件等）
+7. **PerformanceTest.php** - 性能测试（编译性能、运行时性能、内存使用）
 
 ## BasicFeaturesTest.php
 
@@ -54,6 +58,72 @@ php test/NamedLoopTest.php
 4. 跨平台路径处理正确
 5. PHP 5-8 兼容性
 
+## ApiMethodsTest.php
+
+测试模板引擎的所有 API 方法：
+- `outString()` - 返回 HTML 字符串（基本用法、显式传递变量、强制刷新缓存）
+- `outCache()` - 返回缓存文件路径（基本用法、缓存文件存在性）
+- `includeTemplate()` - 安全地 include 模板文件（基本用法、显式传递变量）
+- `getTemplateVars()` - 获取模板变量（open 模式、显式传递）
+- `out()` - 通用输出方法（PHPC 模式、HTML 模式、EVAL 模式）
+- `outHTML()` - 返回 HTML 文件路径或内容（返回文件路径、返回内容、显式传递变量）
+- `outEval()` - 返回可 eval 的字符串（基本用法、执行结果）
+
+**运行方法：**
+```bash
+php test/ApiMethodsTest.php
+```
+
+## VariableAccessControlTest.php
+
+测试模板引擎的变量访问控制功能：
+- **open 模式**（完全开放，默认）- 可以访问所有全局变量
+- **whitelist 模式**（白名单）- 只允许访问白名单中的变量
+- **explicit 模式**（显式传递）- 只使用显式传递的变量
+- **变量泄露防护** - 验证敏感变量不会被意外访问
+- **显式传递优先级** - 验证显式传递变量优先于配置模式
+
+**运行方法：**
+```bash
+php test/VariableAccessControlTest.php
+```
+
+## EdgeCasesTest.php
+
+测试模板引擎的边界情况处理：
+- 空数组处理
+- null 值处理
+- 空字符串处理
+- 特殊字符处理
+- 嵌套循环深度
+- 深层嵌套
+- 大数组处理
+- 大模板文件
+- 循环中的 continue
+- switch 中的 break
+- 变量未定义
+- 数组键不存在
+
+**运行方法：**
+```bash
+php test/EdgeCasesTest.php
+```
+
+## PerformanceTest.php
+
+测试模板引擎的性能：
+- **编译性能** - 测试模板编译速度
+- **运行时性能** - 测试使用缓存后的运行速度
+- **内存使用** - 测试处理大数组时的内存占用
+- **缓存效果** - 验证缓存机制的性能提升
+
+**注意**：性能测试结果会因环境而异，主要用于相对比较。
+
+**运行方法：**
+```bash
+php test/PerformanceTest.php
+```
+
 ## 快速开始
 
 ### 本地测试
@@ -65,6 +135,10 @@ php test/NamedLoopTest.php
 php test/BasicFeaturesTest.php
 php test/NamedLoopTest.php
 php test/CheckSyntaxTest.php
+php test/ApiMethodsTest.php
+php test/VariableAccessControlTest.php
+php test/EdgeCasesTest.php
+php test/PerformanceTest.php
 ```
 
 ### Docker 多版本测试（推荐用于兼容性测试）
@@ -114,6 +188,58 @@ php test/CheckSyntaxTest.php
 - Unix/Linux/macOS: 测试标准路径处理
 
 **总计**: 约 13-15 个测试用例（根据环境不同可能跳过部分测试）
+
+### 7. API 方法测试（16个）
+- ✅ outString() 基本用法
+- ✅ outString() 显式传递变量
+- ✅ outString() 强制刷新缓存
+- ✅ outCache() 基本用法
+- ✅ outCache() 缓存文件存在性
+- ✅ includeTemplate() 基本用法
+- ✅ includeTemplate() 显式传递变量
+- ✅ getTemplateVars() open 模式
+- ✅ getTemplateVars() 显式传递
+- ✅ out() PHPC 模式
+- ✅ out() HTML 模式
+- ✅ out() EVAL 模式
+- ✅ outHTML() 返回文件路径
+- ✅ outHTML() 返回内容
+- ✅ outHTML() 显式传递变量
+- ✅ outEval() 基本用法和执行结果
+
+### 8. 变量访问控制测试（10个）
+- ✅ open 模式（完全开放）
+- ✅ whitelist 模式（白名单）
+- ✅ whitelist 模式（空白名单回退）
+- ✅ explicit 模式（显式传递）
+- ✅ 显式传递变量优先级
+- ✅ 变量泄露防护 - open 模式
+- ✅ 变量泄露防护 - whitelist 模式
+- ✅ 变量泄露防护 - explicit 模式
+- ✅ outString() 的变量传递
+- ✅ includeTemplate() 的变量传递
+
+### 9. 边界情况测试（12个）
+- ✅ 空数组处理
+- ✅ null 值处理
+- ✅ 空字符串处理
+- ✅ 特殊字符处理
+- ✅ 嵌套循环深度
+- ✅ 深层嵌套
+- ✅ 大数组处理
+- ✅ 大模板文件
+- ✅ 循环中的 continue
+- ✅ switch 中的 break
+- ✅ 变量未定义
+- ✅ 数组键不存在
+
+### 10. 性能测试（4个）
+- ✅ 编译性能
+- ✅ 运行时性能
+- ✅ 内存使用
+- ✅ 缓存效果
+
+**总计**: 约 70+ 个测试用例（根据环境不同可能跳过部分测试）
 
 ## Docker 测试详细说明
 

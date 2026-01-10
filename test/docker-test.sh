@@ -74,7 +74,7 @@ test_php_version() {
         -v "$PROJECT_DIR:/app" \
         -w /app \
         "$image" \
-        php test/CheckSyntaxTest.php 2>&1; then
+        bash test/run_tests.sh 2>&1; then
         echo -e "${GREEN}✓ PHP ${version} 测试通过${NC}"
         PASSED=$((PASSED + 1))
     else

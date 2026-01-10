@@ -34,24 +34,25 @@
 - 路径安全
 - 最佳实践
 
+### 5. [性能优化指南](performance.md)
+性能优化建议和最佳实践：
+- 性能特性
+- 缓存机制
+- 编译优化
+- 运行时优化
+- 内存优化
+- 性能测试
+
 ## 内部文档
 
-### [技术评估](INTERNAL/comprehensive_evaluation.md)
-项目的全面技术评估报告：
-- 架构设计评估
+### [项目全面评估报告](INTERNAL/project_evaluation_2026.md)
+项目的全面评估报告（2026年1月）：
+- 功能完整性评估
+- 示例覆盖情况
+- 测试覆盖情况
+- 文档覆盖情况
 - 代码质量评估
-- 安全性评估（已修复 extract($GLOBALS) 安全问题）
-- 性能评估
-- 可维护性评估
-
-### [代码质量改进](INTERNAL/code_quality_improvements.md)
-代码质量改进建议和实施状态：
-- 已实施的改进（包括 extract($GLOBALS) 安全问题修复）
-- 待改进的问题
-- 实施优先级
-
-### [引擎评估](INTERNAL/engine_evaluation.md)
-引擎功能评估和改进建议。
+- 符合 do.md 要求评估
 
 ## 快速参考
 

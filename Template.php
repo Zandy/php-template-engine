@@ -82,28 +82,25 @@ define('ZANDY_TEMPLATE_DELIMITER_VAR_RIGHT', '}'); // 变量输出右分隔符
 #defined('ZANDY_TEMPLATE_INONEFILE') || define('ZANDY_TEMPLATE_INONEFILE', FALSE); // 20060408
 class Zandy_Template
 {
-
     /**
-     * constructor
-     * @createtime
-     * @return
-     * @throws       none
-     * @author       Zandy
-     * @modifiedby   $LastChangedBy:  $
-     * @parameter
+     * 构造函数（PHP 5+）
+     *
+     * Zandy_Template 类使用静态方法，构造函数为空。
+     * 保留此方法以支持实例化语法（虽然不推荐）。
+     *
+     * @return void
      */
     public function __construct()
     {
     }
 
     /**
-     * constructor
-     * @createtime
-     * @return
-     * @throws       none
-     * @author       Zandy
-     * @modifiedby   $LastChangedBy:  $
-     * @parameter
+     * 构造函数（PHP 4 兼容）
+     *
+     * PHP 4 风格的构造函数，用于向后兼容。
+     * Zandy_Template 类使用静态方法，构造函数为空。
+     *
+     * @return void
      */
     public function Zandy_Template()
     {
@@ -111,6 +108,19 @@ class Zandy_Template
         $this->__construct();
     }
 
+    /**
+     * 错误处理函数：输出错误信息并终止脚本执行
+     *
+     * 当模板引擎遇到严重错误时调用此方法，会：
+     * 1. 设置 HTTP 503 状态码
+     * 2. 输出错误信息
+     * 3. 可选择发送告警邮件
+     * 4. 终止脚本执行
+     *
+     * @param string $msg 错误信息
+     * @param bool $send_email 是否发送告警邮件（默认 false）
+     * @return void 此方法不会返回，会终止脚本执行
+     */
     public static function halt($msg, $send_email = false)
     {
         @header('HTTP/1.1 503 Service Temporarily Unavailable');
@@ -124,23 +134,23 @@ class Zandy_Template
 
     /**
      * 根据配置提取模板变量
-     * 
+     *
      * 支持三种模式：
      * 1. 'open' (默认): 完全开放模式，提取所有全局变量（向后兼容）
      * 2. 'whitelist': 白名单模式，只提取指定的变量（推荐用于生产环境）
      * 3. 'explicit': 显式模式，只使用显式传递的变量（最安全）
-     * 
+     *
      * 配置方式：
      * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
      * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data', 'items'];
-     * 
+     *
      * @param array|null $explicitVars 显式传递的变量（优先级最高，如果提供则忽略配置）
      * @return array 提取的变量数组
      */
     private static function extractTemplateVars($explicitVars = null)
     {
         $siteConf = isset($GLOBALS['siteConf']) ? $GLOBALS['siteConf'] : array();
-        
+
         // 如果提供了显式变量，直接使用（优先级最高）
         if ($explicitVars !== null && is_array($explicitVars)) {
             // 始终包含 siteConf（模板引擎需要）
@@ -149,15 +159,15 @@ class Zandy_Template
             }
             return $explicitVars;
         }
-        
+
         // 根据配置模式提取变量
         $mode = isset($siteConf['template_vars_mode']) ? $siteConf['template_vars_mode'] : 'open';
-        
+
         switch ($mode) {
             case 'whitelist':
                 // 白名单模式：只提取指定的变量
-                $whitelist = isset($siteConf['template_vars_whitelist']) 
-                    ? $siteConf['template_vars_whitelist'] 
+                $whitelist = isset($siteConf['template_vars_whitelist'])
+                    ? $siteConf['template_vars_whitelist']
                     : [];
                 if (empty($whitelist)) {
                     // 如果白名单为空，回退到完全开放模式（向后兼容）
@@ -174,7 +184,7 @@ class Zandy_Template
                     $vars['siteConf'] = $GLOBALS['siteConf'];
                 }
                 return $vars;
-                
+
             case 'explicit':
                 // 显式模式：只使用显式传递的变量
                 // 如果没有显式传递，只包含 siteConf
@@ -183,7 +193,7 @@ class Zandy_Template
                     $vars['siteConf'] = $GLOBALS['siteConf'];
                 }
                 return $vars;
-                
+
             case 'open':
             default:
                 // 完全开放模式：提取所有全局变量（默认，向后兼容）
@@ -191,6 +201,44 @@ class Zandy_Template
         }
     }
 
+    /**
+     * 通用输出方法：根据缓存模式返回不同的结果
+     *
+     * 这是一个通用方法，根据 $cacheMod 参数调用不同的输出方法：
+     * - ZANDY_TEMPLATE_CACHE_MOD_PHPC (1): 返回 PHP 缓存文件路径（用于 include）
+     * - ZANDY_TEMPLATE_CACHE_MOD_HTML (2): 返回 HTML 文件路径
+     * - ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS (8): 返回 HTML 内容字符串
+     * - ZANDY_TEMPLATE_CACHE_MOD_EVAL (4): 返回可 eval 的 PHP 代码字符串
+     *
+     * @param string $tplFileName 模板文件名（如 'header.htm'）
+     * @param string $tplDir 模板目录路径（可选，默认使用 $GLOBALS['siteConf']['tplDir']）
+     * @param string $cacheDir 缓存目录路径（可选，默认使用 $GLOBALS['siteConf']['tplCacheBaseDir']）
+     * @param bool $forceRefreshCache 是否强制刷新缓存（默认 false）
+     * @param int $cacheMod 缓存模式（默认 ZANDY_TEMPLATE_CACHE_MOD_PHPC）：
+     *   - ZANDY_TEMPLATE_CACHE_MOD_PHPC (1): 返回 PHP 缓存文件路径
+     *   - ZANDY_TEMPLATE_CACHE_MOD_HTML (2): 返回 HTML 文件路径
+     *   - ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS (8): 返回 HTML 内容字符串
+     *   - ZANDY_TEMPLATE_CACHE_MOD_EVAL (4): 返回可 eval 的 PHP 代码字符串
+     * @param array|null $vars 显式传递的变量（可选，仅用于 HTML 模式）
+     * @return string|false 根据 $cacheMod 返回文件路径、内容字符串或 PHP 代码，失败返回 false
+     *
+     * @example
+     * // 返回 PHP 缓存文件路径（用于 include）
+     * $cacheFile = Zandy_Template::out('template.htm', $tplDir, $cacheDir, false, ZANDY_TEMPLATE_CACHE_MOD_PHPC);
+     * include $cacheFile;
+     *
+     * // 返回 HTML 文件路径
+     * $htmlFile = Zandy_Template::out('template.htm', $tplDir, $cacheDir, false, ZANDY_TEMPLATE_CACHE_MOD_HTML);
+     * echo file_get_contents($htmlFile);
+     *
+     * // 返回 HTML 内容字符串
+     * $html = Zandy_Template::out('template.htm', $tplDir, $cacheDir, false, ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS, ['user' => $user]);
+     * echo $html;
+     *
+     * // 返回可 eval 的 PHP 代码
+     * $code = Zandy_Template::out('template.htm', $tplDir, false, false, ZANDY_TEMPLATE_CACHE_MOD_EVAL);
+     * eval($code);
+     */
     public static function out($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $cacheMod = ZANDY_TEMPLATE_CACHE_MOD_PHPC, $vars = null)
     {
         $mods = ZANDY_TEMPLATE_CACHE_MOD_PHPC | ZANDY_TEMPLATE_CACHE_MOD_HTML | ZANDY_TEMPLATE_CACHE_MOD_EVAL;
@@ -213,22 +261,22 @@ class Zandy_Template
 
     /**
      * 返回填充数据后的 HTML 字符串（推荐）
-     * 
+     *
      * @param string $tplFileName 模板文件名
      * @param string $tplDir 模板目录
      * @param string $cacheDir 缓存目录
      * @param bool $forceRefreshCache 是否强制刷新缓存
      * @param array|null $vars 显式传递的变量（可选，如果提供则只使用这些变量，忽略全局变量配置）
      * @return string HTML 字符串
-     * 
+     *
      * 使用示例：
      * // 方式1：使用全局变量（向后兼容）
      * $GLOBALS['user'] = $user;
      * $html = Zandy_Template::outString('template.htm', $tplDir, $cacheDir);
-     * 
+     *
      * // 方式2：显式传递变量（更安全）
      * $html = Zandy_Template::outString('template.htm', $tplDir, $cacheDir, false, ['user' => $user]);
-     * 
+     *
      * // 方式3：配置白名单模式
      * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
      * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data'];
@@ -246,26 +294,27 @@ class Zandy_Template
 
     /**
      * 安全地 include 模板文件（推荐用于 outCache 方式）
-     * 
+     *
      * 使用示例：
      * // 方式1：使用全局变量（向后兼容）
      * $GLOBALS['user'] = $user;
      * Zandy_Template::includeTemplate('template.htm', $tplDir, $cacheDir);
-     * 
+     *
      * // 方式2：显式传递变量（更安全，推荐用于函数/类方法内部）
      * Zandy_Template::includeTemplate('template.htm', $tplDir, $cacheDir, false, ['user' => $user]);
-     * 
+     *
      * // 方式3：配置白名单模式
      * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
      * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data'];
      * $GLOBALS['user'] = $user;
      * Zandy_Template::includeTemplate('template.htm', $tplDir, $cacheDir);
-     * 
+     *
      * @param string $tplFileName 模板文件名
      * @param string $tplDir 模板目录
      * @param string $cacheDir 缓存目录
      * @param bool $forceRefreshCache 是否强制刷新缓存
      * @param array|null $vars 显式传递的变量（可选，如果提供则只使用这些变量，忽略全局变量配置）
+     * @return void 此方法直接输出内容，不返回值
      */
     public static function includeTemplate($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $vars = null)
     {
@@ -276,13 +325,13 @@ class Zandy_Template
 
     /**
      * 安全地提取模板变量（用于 outCache + include 方式）
-     * 
+     *
      * 使用示例：
      * // 方式1：显式传递变量（推荐）
      * $cacheFile = Zandy_Template::outCache('template.htm', $tplDir, $cacheDir);
      * extract(Zandy_Template::getTemplateVars(['user' => $user]));
      * include $cacheFile;
-     * 
+     *
      * // 方式2：使用配置模式
      * $GLOBALS['siteConf']['template_vars_mode'] = 'whitelist';
      * $GLOBALS['siteConf']['template_vars_whitelist'] = ['user', 'data'];
@@ -290,7 +339,7 @@ class Zandy_Template
      * $cacheFile = Zandy_Template::outCache('template.htm', $tplDir, $cacheDir);
      * extract(Zandy_Template::getTemplateVars());  // 使用配置的白名单
      * include $cacheFile;
-     * 
+     *
      * @param array|null $explicitVars 显式传递的变量（可选，如果提供则只使用这些变量，忽略全局变量配置）
      * @return array 提取的变量数组
      */
@@ -300,13 +349,28 @@ class Zandy_Template
     }
 
     /**
+     * 编译模板并返回 PHP 缓存文件路径
      *
-     * @createtime
-     * @return
-     * @throws       none
-     * @author       Zandy
-     * @modifiedby   $LastChangedBy:  $
-     * @parameter
+     * 将模板文件编译成 PHP 文件并缓存，返回缓存文件的完整路径。
+     * 如果模板文件已修改或强制刷新，会重新编译。
+     * 编译后的 PHP 文件可以直接使用 include 包含执行。
+     *
+     * @param string $tplFileName 模板文件名（如 'header.htm'）
+     * @param string $tplDir 模板目录路径（可选，默认使用 $GLOBALS['siteConf']['tplDir']）
+     * @param string $cacheDir 缓存目录路径（可选，默认使用 $GLOBALS['siteConf']['tplCacheBaseDir']）
+     * @param bool $forceRefreshCache 是否强制刷新缓存（默认 false）
+     * @return string|false 返回缓存文件的完整路径，失败返回 false
+     *
+     * @example
+     * // 基本用法
+     * $cacheFile = Zandy_Template::outCache('header.htm', '/path/to/templates/', '/path/to/cache/');
+     * if ($cacheFile) {
+     *     extract(Zandy_Template::getTemplateVars());
+     *     include $cacheFile;
+     * }
+     *
+     * // 强制刷新缓存
+     * $cacheFile = Zandy_Template::outCache('header.htm', $tplDir, $cacheDir, true);
      */
     public static function outCache($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false)
     {
@@ -475,6 +539,28 @@ class Zandy_Template
         }
     }
 
+    /**
+     * 检查 PHP 文件的语法是否正确
+     *
+     * 使用优先级策略检查语法：
+     * 1. opcache_compile_file（最安全，只编译不执行，需要 OPcache 扩展）
+     * 2. php -l CLI 命令（安全，独立进程，需要 PHP CLI）
+     * 3. eval（最后备选，可能不安全）
+     *
+     * 如果检测到语法错误，会返回详细的错误信息（包含文件名和行号）。
+     *
+     * @param string $filename 要检查的 PHP 文件路径
+     * @param string $tplName 模板名称（可选，用于错误信息显示）
+     * @return bool|string 语法正确返回 true，语法错误返回错误信息字符串
+     *
+     * @example
+     * // 检查编译后的缓存文件语法
+     * $cacheFile = Zandy_Template::outCache('template.htm', $tplDir, $cacheDir);
+     * $result = Zandy_Template::check_syntax($cacheFile, 'template.htm');
+     * if ($result !== true) {
+     *     echo "语法错误: " . $result;
+     * }
+     */
     public static function check_syntax($filename, $tplName = '')
     {
         $error_message = null;
@@ -568,11 +654,15 @@ class Zandy_Template
     }
 
     /**
-     * 使用 opcache_compile_file 检查语法 (最安全)
-     * @param string $filename
-     * @param string &$error_message
-     * @param int &$error_line
-     * @return bool
+     * 使用 opcache_compile_file 检查语法（优先级1）
+     *
+     * 最安全的语法检查方法，只编译不执行，不会影响当前进程。
+     * 需要 OPcache 扩展已安装且已启用（在 CLI 模式下需要 opcache.enable_cli=On）。
+     *
+     * @param string $filename 要检查的 PHP 文件路径
+     * @param string|null &$error_message 错误信息（通过引用返回）
+     * @param int &$error_line 错误行号（通过引用返回）
+     * @return bool 语法正确返回 true，语法错误返回 false
      */
     private static function check_syntax_with_opcache($filename, &$error_message = null, &$error_line = 0)
     {
@@ -633,11 +723,15 @@ class Zandy_Template
     }
 
     /**
-     * 使用 php -l 命令检查语法 (安全，独立进程)
-     * @param string $filename
-     * @param string &$error_message
-     * @param int &$error_line
-     * @return bool
+     * 使用 php -l 命令检查语法（优先级2）
+     *
+     * 通过执行独立的 PHP CLI 进程检查语法，安全且可靠。
+     * 支持 Windows 和 Unix 系统，自动处理 PHP 路径。
+     *
+     * @param string $filename 要检查的 PHP 文件路径
+     * @param string|null &$error_message 错误信息（通过引用返回）
+     * @param int &$error_line 错误行号（通过引用返回）
+     * @return bool 语法正确返回 true，语法错误返回 false
      */
     private static function check_syntax_with_php_cli($filename, &$error_message = null, &$error_line = 0)
     {
@@ -771,11 +865,15 @@ class Zandy_Template
     }
 
     /**
-     * 使用 eval 检查语法 (兜底方案，不安全但兼容性最好)
-     * @param string $filename
-     * @param string &$error_message
-     * @param int &$error_line
-     * @return bool
+     * 使用 eval 检查语法（优先级3，最后备选）
+     *
+     * 通过包装代码并使用 eval 检查语法，兼容 PHP 5.6+。
+     * 注意：此方法会执行代码，可能存在安全风险，仅在无法使用前两种方法时使用。
+     *
+     * @param string $filename 要检查的 PHP 文件路径
+     * @param string|null &$error_message 错误信息（通过引用返回）
+     * @param int &$error_line 错误行号（通过引用返回）
+     * @return bool 语法正确返回 true，语法错误返回 false
      */
     private static function check_syntax_with_eval($filename, &$error_message = null, &$error_line = 0)
     {
@@ -933,15 +1031,31 @@ class Zandy_Template
     }
 
     /**
-     * 返回 HTML 文件路径或内容
-     * 
-     * @param string $tplFileName 模板文件名
-     * @param string $tplDir 模板目录
-     * @param string $cacheDir 缓存目录
-     * @param bool $forceRefreshCache 是否强制刷新缓存
-     * @param int $outMod 输出模式
-     * @param array|null $vars 显式传递的变量（可选）
-     * @return string|false HTML 文件路径或内容
+     * 编译模板并返回 HTML 文件路径或内容
+     *
+     * 根据 $outMod 参数决定返回文件路径还是 HTML 内容。
+     * 模板会被编译并缓存为 HTML 文件，支持原子写入（避免并发写入问题）。
+     *
+     * @param string $tplFileName 模板文件名（如 'page.htm'）
+     * @param string $tplDir 模板目录路径（可选，默认使用 $GLOBALS['siteConf']['tplDir']）
+     * @param string $cacheDir 缓存目录路径（可选，默认使用 $GLOBALS['siteConf']['cacheHTMLDir']）
+     * @param bool $forceRefreshCache 是否强制刷新缓存（默认 false）
+     * @param int $outMod 输出模式（默认 ZANDY_TEMPLATE_CACHE_MOD_HTML）：
+     *   - ZANDY_TEMPLATE_CACHE_MOD_HTML (2): 返回 HTML 文件路径
+     *   - ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS (8): 返回 HTML 内容字符串
+     * @param array|null $vars 显式传递的变量（可选，如果提供则只使用这些变量，忽略全局变量配置）
+     * @return string|false 根据 $outMod 返回文件路径或内容字符串，失败返回 false
+     *
+     * @example
+     * // 返回文件路径
+     * $htmlFile = Zandy_Template::outHTML('page.htm', $tplDir, $cacheDir, false, ZANDY_TEMPLATE_CACHE_MOD_HTML);
+     * if ($htmlFile) {
+     *     echo file_get_contents($htmlFile);
+     * }
+     *
+     * // 返回 HTML 内容
+     * $html = Zandy_Template::outHTML('page.htm', $tplDir, $cacheDir, false, ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS, ['user' => $user]);
+     * echo $html;
      */
     public static function outHTML($tplFileName, $tplDir = '', $cacheDir = '', $forceRefreshCache = false, $outMod = ZANDY_TEMPLATE_CACHE_MOD_HTML, $vars = null)
     {
@@ -959,11 +1073,12 @@ class Zandy_Template
         }
         $f = $tplDir . $tplFileName;
         if (is_file($f)) {
+            $r = null; // 初始化 $r 变量
             if (!file_exists($cacheRealFilename) || filemtime($f) > filemtime($cacheRealFilename) || $forceRefreshCache) {
                 ob_start();
                 $s = file_get_contents($f);
-                $r = Zandy_Template::parse($s, $tplDir);
-                eval($r); // need GLOBALS var
+                $parsed = Zandy_Template::parse($s, $tplDir);
+                eval($parsed); // need GLOBALS var
                 $r = ob_get_clean();
                 $cacheRealDir = dirname($cacheDir . $tplFileName);
                 if (!file_exists($cacheRealDir)) {
@@ -1002,6 +1117,11 @@ class Zandy_Template
                     }
                 }
 
+            } else {
+                // 如果缓存文件已存在，需要读取缓存文件内容（当需要返回内容时）
+                if ($outMod & ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS) {
+                    $r = file_get_contents($cacheRealFilename);
+                }
             }
             if ($outMod & ZANDY_TEMPLATE_CACHE_MOD_HTML_CONTENTS) {
                 return $r; // return html contents
@@ -1012,6 +1132,33 @@ class Zandy_Template
         }
     }
 
+    /**
+     * 解析模板并返回可 eval 的 PHP 代码字符串
+     *
+     * 将模板文件解析为可执行的 PHP 代码字符串，不生成缓存文件。
+     * 适用于需要直接执行模板代码的场景，或需要自定义变量作用域的场景。
+     *
+     * @param string $tplFileName 模板文件名（如 'template.htm'）
+     * @param string $tplDir 模板目录路径（可选，默认使用 $GLOBALS['siteConf']['tplDir']）
+     * @return string|false 返回可 eval 的 PHP 代码字符串，失败返回 false
+     *
+     * @example
+     * // 基本用法
+     * $code = Zandy_Template::outEval('template.htm', $tplDir);
+     * if ($code) {
+     *     extract(['user' => $user, 'data' => $data]);
+     *     eval($code);
+     * }
+     *
+     * // 在函数内部使用（避免全局变量污染）
+     * function renderTemplate($tplFile, $tplDir, $vars) {
+     *     $code = Zandy_Template::outEval($tplFile, $tplDir);
+     *     if ($code) {
+     *         extract($vars);
+     *         eval($code);
+     *     }
+     * }
+     */
     public static function outEval($tplFileName, $tplDir = '')
     {
         //global $siteConf;
@@ -1028,13 +1175,28 @@ class Zandy_Template
     }
 
     /**
-     * 核心处理方法
-     * @createtime
-     * @return
-     * @throws       none
-     * @author       Zandy
-     * @modifiedby   $LastChangedBy: Zandy $
-     * @parameter
+     * 核心解析方法：将模板内容解析为 PHP 代码
+     *
+     * 这是模板引擎的核心方法，将模板语法转换为可执行的 PHP 代码。
+     * 支持所有模板语法特性：
+     * - 变量输出：{$var}, {$array['key']}
+     * - 循环：loop, for, foreach（12种格式）
+     * - 条件判断：if, elseif, else
+     * - Switch 语句：switch, case, default, break
+     * - 模板包含：template, include, include_once
+     * - PHP 代码块：php
+     * - 其他：set, echo, time, date, LANG 等
+     *
+     * @param string $s 模板内容字符串
+     * @param string $tplDir 模板目录路径（用于解析相对路径的包含，可选）
+     * @param string $cacheDir 缓存目录路径（可选，当前未使用）
+     * @return string 解析后的 PHP 代码字符串
+     *
+     * @example
+     * $template = '{$var}<!--{if $condition}-->Yes<!--{/if}-->';
+     * $phpCode = Zandy_Template::parse($template, '/path/to/templates/');
+     * extract(['var' => 'value', 'condition' => true]);
+     * eval($phpCode);
      */
     public static function parse($s, $tplDir = '', $cacheDir = '')
     {
@@ -1047,10 +1209,8 @@ class Zandy_Template
         $loopStackVar = '__zte_loop_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
         $loopInfoStackVar = '__zte_loop_info_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
         $loopNamesStackVar = '__zte_loop_names_stack_' . str_replace('.', '_', uniqid('', true)) . '__';
-        $tplDir = str_replace("\\", "/", $tplDir);
-        $tplDir = preg_replace("/[\\/]+/", "/", $tplDir);
-        $cacheDir = str_replace("\\", "/", $cacheDir);
-        $cacheDir = preg_replace("/[\\/]+/", "/", $cacheDir);
+        $tplDir = Zandy_Template::normalizePath($tplDir);
+        $cacheDir = Zandy_Template::normalizePath($cacheDir);
         // 去掉注释（模板语法的注释），具体语法为 <!--{*这是注释内容*}-->
         $s = preg_replace("/\\<\\!\\-\\-\\{\\*.*\\*\\}\\-\\-\\>/isU", '', $s);
         $s = "echo <<<$EOB\r\n" . $s . "\r\n$EOB;\r\n";
@@ -1081,7 +1241,7 @@ class Zandy_Template
         // foreach 循环：<!--{foreach $items as $item}-->
         // 为了支持 foreach-else，需要在循环前检查数组是否为空（类似 loop 的处理）
         // 提取数组变量名：foreach($arr as $key => $value) 或 foreach($arr as $value)
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "foreach\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "foreach\\s+(.+)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB) {
             $foreachExpr = trim($m[1]);
             // 提取数组变量名：从 "as" 之前提取
             if (preg_match('/^(\S+)\s+as\s+/i', $foreachExpr, $arrMatch)) {
@@ -1098,7 +1258,7 @@ class Zandy_Template
         // 使用栈结构支持嵌套循环，每个循环层级有独立的计数器
         // 提供 $loop 变量供用户使用，包含 index, iteration, first, last, length 等属性
         // 格式1: <!--{loop $arr AS $key => $value name="loopname"}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1109,7 +1269,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
         }, $s);
         // 格式3: <!--{loop $arr AS $value name="loopname"}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
             $arr = $m[2];
             $val = $m[3];
             $name = isset($m[4]) && !empty($m[4]) ? $m[4] : '';
@@ -1119,7 +1279,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
         }, $s);
         // 格式2: <!--{loop $arr AS $key $value name="loopname"}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1130,7 +1290,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
         }, $s);
         // 格式4: <!--{loop $arr $key => $value name="loopname"}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1141,7 +1301,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
         }, $s);
         // 格式5: <!--{loop $arr $key $value name="loopname"}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1152,7 +1312,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
         }, $s);
         // 格式6: <!--{loop $arr $value name="loopname"}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)(?:\\s+name\\s*=\\s*[\"'](\\w+)[\"'])?\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar, $loopInfoStackVar, $loopNamesStackVar) {
             $arr = $m[2];
             $val = $m[3];
             $name = isset($m[4]) && !empty($m[4]) ? $m[4] : '';
@@ -1162,7 +1322,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . $name_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;" . $name_iter . "echo <<<$EOB\r\n";
         }, $s);
         // 格式7: <!--{loop $arr AS $key => $value}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1170,7 +1330,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
         }, $s);
         // 格式8: <!--{loop $arr AS $key $value}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1178,14 +1338,14 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
         }, $s);
         // 格式9: <!--{loop $arr AS $value}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+AS\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar) {
             $arr = $m[2];
             $val = $m[3];
             $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
         }, $s);
         // 格式10: <!--{loop $arr $key => $value}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*\\=\\>\\s*(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1193,7 +1353,7 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
         }, $s);
         // 格式11: <!--{loop $arr $key $value}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar) {
             $arr = $m[2];
             $key = $m[3];
             $val = $m[4];
@@ -1201,16 +1361,18 @@ class Zandy_Template
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $key => $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
         }, $s);
         // 格式12: <!--{loop $arr $value}-->
-        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function($m) use ($EOB, $loopStackVar) {
+        $s = preg_replace_callback("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop)\\s+(\\S+)\\s+(\\S+)\\s*" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", function ($m) use ($EOB, $loopStackVar) {
             $arr = $m[2];
             $val = $m[3];
             $stack_init = "if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();";
+            // 当数组为空时，在 else 分支中初始化栈并推入计数器0，以支持 loop-else
             return "\r\n$EOB;\r\nif (is_array($arr)&&sizeof($arr)>0){" . $stack_init . "foreach($arr as $val){" . '$' . $loopStackVar . "[]=0;" . '$' . $loopStackVar . "[count(" . '$' . $loopStackVar . ")-1]++;echo <<<$EOB\r\n";
         }, $s);
 
         // 循环的 else 分支：<!--{loop-else}-->, <!--{foreach-else}-->, <!--{for-else}-->
         // loop-else：出栈并判断：如果计数器为0，执行else分支，并闭合 if (is_array) 大括号
-        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}if(isset(" . '$' . $loopStackVar . ")&&count(" . '$' . $loopStackVar . ")>0){\$__zte_loop_count__=array_pop(" . '$' . $loopStackVar . ");if(isset(" . '$' . $loopNamesStackVar . ")&&count(" . '$' . $loopNamesStackVar . ")>0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopNamesStackVar . ");}if(isset(" . '$' . $loopInfoStackVar . ")&&count(" . '$' . $loopInfoStackVar . ")>0 && isset(" . '$' . $loopNamesStackVar . ") && count(" . '$' . $loopNamesStackVar . ") > 0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopInfoStackVar . ");}if(\$__zte_loop_count__==0){echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}}}echo <<<$EOB\r\n", $s);
+        // 当数组为空时，在栈中推入计数器0，以便 loop-else 能正确检测空数组情况
+        $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(loop-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(loop)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}}else{if(!isset(" . '$' . $loopStackVar . "))" . '$' . $loopStackVar . "=array();" . '$' . $loopStackVar . "[]=0;}if(isset(" . '$' . $loopStackVar . ")&&count(" . '$' . $loopStackVar . ")>0){\$__zte_loop_count__=array_pop(" . '$' . $loopStackVar . ");if(isset(" . '$' . $loopNamesStackVar . ")&&count(" . '$' . $loopNamesStackVar . ")>0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopNamesStackVar . ");}if(isset(" . '$' . $loopInfoStackVar . ")&&count(" . '$' . $loopInfoStackVar . ")>0 && isset(" . '$' . $loopNamesStackVar . ") && count(" . '$' . $loopNamesStackVar . ") > 0 && !empty(" . '$' . $loopNamesStackVar . "[count(" . '$' . $loopNamesStackVar . ")-1])){array_pop(" . '$' . $loopInfoStackVar . ");}if(\$__zte_loop_count__==0){echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}}echo <<<$EOB\r\n", $s);
         // foreach-else：由于 foreach 已经包含数组检查，这里只需要添加 else 分支
         $s = preg_replace("/" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "(foreach-else)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "(.*)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_LEFT . "\\/(foreach)" . ZANDY_TEMPLATE_DELIMITER_LOGIC_RIGHT . "/siU", "\r\n$EOB;\r\n}}else{echo <<<$EOB\r\n\\2\r\n$EOB;\r\n}echo <<<$EOB\r\n", $s);
         // for-else：for 循环不支持 else，但为了语法一致性，提供空实现
@@ -1374,6 +1536,39 @@ class Zandy_Template
     }
      */
 
+    /**
+     * 规范化路径格式（统一为正斜杠）
+     *
+     * 将路径中的反斜杠统一为正斜杠，并合并多个连续的正斜杠为单个正斜杠。
+     * 用于模板路径和缓存路径的规范化，确保路径格式一致。
+     *
+     * @param string $path 路径字符串
+     * @return string 规范化后的路径（统一为正斜杠）
+     *
+     * @example
+     * $path = Zandy_Template::normalizePath('path\\to//dir\\subdir');
+     * // 结果: 'path/to/dir/subdir'
+     */
+    public static function normalizePath($path)
+    {
+        $path = str_replace("\\", "/", $path);
+        $path = preg_replace("/[\\/]+/", "/", $path);
+        return $path;
+    }
+
+    /**
+     * 调整目录路径格式
+     *
+     * 统一路径分隔符，处理路径中的冗余分隔符。
+     * 将混合的 / 和 \ 统一为系统默认的分隔符。
+     *
+     * @param string $dir 目录路径
+     * @return string 调整后的目录路径
+     *
+     * @example
+     * $path = Zandy_Template::adjustDir('path/to//dir\\subdir');
+     * // 结果: 'path/to/dir/subdir' (Unix) 或 'path\to\dir\subdir' (Windows)
+     */
     public static function adjustDir($dir)
     {
         #$dir = preg_replace("/[\\/\\\\]+/", DIRECTORY_SEPARATOR, $dir);
@@ -1386,9 +1581,23 @@ class Zandy_Template
     }
 
     /**
-     * 实现了 php4 没有的递归创建目录
-     * 下面是 mkdir 的 php5 的原型
-     * mkdir ( string pathname [, int mode [, bool recursive [, resource context]]] )
+     * 递归创建目录（兼容 PHP 4）
+     *
+     * 实现了 PHP 4 没有的递归创建目录功能，兼容 PHP 5+ 的 mkdir() 函数。
+     * 如果目录已存在，直接返回 true。
+     *
+     * @param string $pathname 要创建的目录路径
+     * @param int $mode 目录权限（默认 0777）
+     * @param bool|null $recursive 是否递归创建（默认 null，自动判断）
+     * @param resource|null $context 流上下文（可选，PHP 5+）
+     * @return bool 成功返回 true，失败返回 false
+     *
+     * @example
+     * // 创建单层目录
+     * Zandy_Template::mkdir('/path/to/dir', 0755);
+     *
+     * // 递归创建多层目录
+     * Zandy_Template::mkdir('/path/to/deep/nested/dir', 0755, true);
      */
     public static function mkdir($pathname, $mode = 0777, $recursive = null, $context = null)
     {
@@ -1425,13 +1634,21 @@ class Zandy_Template
     }
 
     /**
-     * adjustPath 整理类似“/a/b/c/d/.././e/f”成“a/b/c/e/f”
-     * @createtime
-     * @param
-     * @return
-     * @throws       none
-     * @author       Zandy
-     * @modifiedby   $LastChangedBy:  $
+     * 规范化路径：处理路径中的 . 和 .. 符号
+     *
+     * 将类似 "/a/b/c/d/.././e/f" 的路径整理为 "a/b/c/e/f"。
+     * 处理路径中的相对路径符号（. 和 ..），生成绝对路径。
+     * 支持 Windows 和 Unix 路径格式。
+     *
+     * @param string $path 原始路径
+     * @return string 规范化后的路径
+     *
+     * @example
+     * $path = Zandy_Template::adjustPath('/a/b/c/d/.././e/f');
+     * // 结果: '/a/b/c/e/f'
+     *
+     * $path = Zandy_Template::adjustPath('C:\\a\\b\\c\\..\\d');
+     * // 结果: 'C:\a\b\d' (Windows)
      */
     public static function adjustPath($path)
     {
@@ -1476,6 +1693,20 @@ class Zandy_Template
         return $d;
     }
 
+    /**
+     * 发送告警邮件
+     *
+     * 当模板引擎遇到严重错误时，发送告警邮件通知管理员。
+     * 需要系统中有 send_mail() 函数可用。
+     * 根据 $GLOBALS['ON_PRODUCT'] 设置不同的告警级别和收件人。
+     *
+     * @param string $msg 错误信息
+     * @return void
+     *
+     * @example
+     * // 通常在 halt() 方法中调用
+     * Zandy_Template::sendAlarmEmail('模板编译失败: ' . $error);
+     */
     public static function sendAlarmEmail($msg)
     {
         if (function_exists('send_mail')) {
@@ -1486,7 +1717,8 @@ class Zandy_Template
                 $alarm_email = 'alarm1@example.com';
             }
             $msg = $title . $msg;
-            $msg .= "<hr><p>PST: " . date("Y-m-d H:i:s") . "</p><hr>";
+            $timezone = date_default_timezone_get();
+            $msg .= "<hr><p>Timezone: {$timezone}, Time: " . date("Y-m-d H:i:s") . "</p><hr>";
             if (file_exists('/var/job/hostname.conf')) {
                 $msg .= file_get_contents('/var/job/hostname.conf');
             }
@@ -1500,6 +1732,22 @@ class Zandy_Template
         }
     }
 
+    /**
+     * 将 PHP 错误类型常量转换为可读的字符串
+     *
+     * 将 PHP 错误类型常量（如 E_ERROR, E_WARNING）转换为对应的字符串名称。
+     * 用于错误日志和调试信息显示。
+     *
+     * @param int $type PHP 错误类型常量（如 E_ERROR, E_WARNING, E_NOTICE 等）
+     * @return string 错误类型名称（如 'E_ERROR', 'E_WARNING'）
+     *
+     * @example
+     * $errorType = Zandy_Template::friendlyErrorType(E_ERROR);
+     * // 结果: 'E_ERROR'
+     *
+     * $errorType = Zandy_Template::friendlyErrorType(E_WARNING);
+     * // 结果: 'E_WARNING'
+     */
     public static function friendlyErrorType($type)
     {
         switch ($type) {

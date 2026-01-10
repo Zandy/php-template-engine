@@ -5,6 +5,10 @@
 
 require_once __DIR__ . '/../Template.php';
 
+// 抑制预期的 PHP Warning（未定义变量是测试的一部分）
+// 这些警告不影响测试结果，但会让输出更清晰
+$oldErrorReporting = error_reporting(E_ALL & ~E_WARNING);
+
 class NamedLoopTest {
     private $tplDir;
     private $cacheDir;
@@ -12,6 +16,15 @@ class NamedLoopTest {
     public function __construct() {
         $this->tplDir = __DIR__ . '/../examples/templates/';
         $this->cacheDir = __DIR__ . '/../examples/cacheztec/';
+        
+        // 设置必要的配置
+        // tplBaseDir 应该是包含 tplDir 的父目录
+        $tplBaseDir = dirname($this->tplDir);
+        $GLOBALS['siteConf'] = array(
+            'tplBaseDir' => $tplBaseDir,
+            'tplCacheBaseDir' => $this->cacheDir,
+            'tplDir' => $this->tplDir,
+        );
     }
     
     /**
@@ -154,4 +167,6 @@ class NamedLoopTest {
 if (php_sapi_name() === 'cli') {
     $test = new NamedLoopTest();
     $test->runAll();
+    // 恢复 error_reporting
+    error_reporting($oldErrorReporting);
 }
